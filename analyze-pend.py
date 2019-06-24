@@ -15,20 +15,20 @@ from nn_models import MLP
 from hnn import HNN
 from utils import L2_loss, from_pickle
 
-#%%
-pend_baseline_stats = from_pickle(EXPERIMENT_DIR + 'pend-baseline-stats.pkl')
-baseline_nfe = np.array(pend_baseline_stats['nfe'])
-baseline_diff_nfe = baseline_nfe[1:] - baseline_nfe[:-1]
-baseline_forward_time = np.array(pend_baseline_stats['forward_time'])
-baseline_backward_time = np.array(pend_baseline_stats['backward_time'])
+# #%%
+# pend_baseline_stats = from_pickle(EXPERIMENT_DIR + 'pend-baseline-stats.pkl')
+# baseline_nfe = np.array(pend_baseline_stats['nfe'])
+# baseline_diff_nfe = baseline_nfe[1:] - baseline_nfe[:-1]
+# baseline_forward_time = np.array(pend_baseline_stats['forward_time'])
+# baseline_backward_time = np.array(pend_baseline_stats['backward_time'])
 
 
-#%%
-pend_hnn_stats = from_pickle(EXPERIMENT_DIR + 'pend-hnn_ode-stats.pkl')
-hnn_nfe = np.array(pend_hnn_stats['nfe'])
-hnn_diff_nfe = hnn_nfe[1:] - hnn_nfe[:-1]
-hnn_forward_time = np.array(pend_hnn_stats['forward_time'])
-hnn_backward_time = np.array(pend_hnn_stats['backward_time'])
+# #%%
+# pend_hnn_stats = from_pickle(EXPERIMENT_DIR + 'pend-hnn_ode-stats.pkl')
+# hnn_nfe = np.array(pend_hnn_stats['nfe'])
+# hnn_diff_nfe = hnn_nfe[1:] - hnn_nfe[:-1]
+# hnn_forward_time = np.array(pend_hnn_stats['forward_time'])
+# hnn_backward_time = np.array(pend_hnn_stats['backward_time'])
 
 #%% [markdown]
 # ## Set some notebook constants
@@ -36,7 +36,7 @@ hnn_backward_time = np.array(pend_hnn_stats['backward_time'])
 
 #%%
 DPI = 300
-FORMAT = 'pdf'
+FORMAT = 'png'
 LINE_SEGMENTS = 10
 ARROW_SCALE = 40
 ARROW_WIDTH = 6e-3
@@ -56,6 +56,7 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
+         'num_points': 2,
          'gpu': 0}
 
 class ObjectView(object):
@@ -88,14 +89,14 @@ plt.tight_layout() ; plt.show()
 
 #%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
-def get_model(args, baseline):
+def get_model(args, baseline, num_points):
     output_dim = args.input_dim if baseline else 1
     nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
     model = HNN(args.input_dim, differentiale_model=nn_model, 
         device=device, baseline=baseline).to(device)
     
-    model_name = 'baseline' if baseline else 'hnn_ode'
-    path = '{}pend-{}.tar'.format(args.save_dir, model_name)
+    model_name = 'baseline_ode' if baseline else 'hnn_ode'
+    path = '{}pend-{}-p{}.tar'.format(args.save_dir, model_name, num_points)
     model.load_state_dict(torch.load(path, map_location=device))
     return model
 
@@ -131,8 +132,8 @@ def integrate_model(model, t_span, y0, **kwargs):
 # ## Run analysis
 
 #%%
-base_ode_model = get_model(args, baseline=True)
-hnn_ode_model = get_model(args, baseline=False)
+base_ode_model = get_model(args, baseline=True, num_points=args.num_points)
+hnn_ode_model = get_model(args, baseline=False, num_points=args.num_points)
 
 # get their vector fields
 R = 2.6
@@ -157,11 +158,7 @@ hnn_ivp = integrate_model(hnn_ode_model, t_span, y0, **kwargs)
 
 
 #%%
-# from utils import from_pickle, to_pickle
-# path = 
-
-
-#%%
+###### PLOT ######
 fig = plt.figure(figsize=(11.3, 3.2), facecolor='white', dpi=DPI)
 # plot physical system
 fig.add_subplot(1, 4, 1, frameon=True) 
@@ -194,7 +191,7 @@ for i, l in enumerate(np.split(base_ivp['y'].T, LINE_SEGMENTS)):
     
 plt.xlabel("$q$", fontsize=14)
 plt.ylabel("$p$", rotation=0, fontsize=14)
-plt.title("Baseline ODE NN", pad=10)
+plt.title("Baseline ODE NN ({})".format(args.num_points), pad=10)
 
 # plot HNN
 fig.add_subplot(1, 4, 4, frameon=True)
@@ -207,10 +204,10 @@ for i, l in enumerate(np.split(hnn_ivp['y'].T, LINE_SEGMENTS)):
 
 plt.xlabel("$q$", fontsize=14)
 plt.ylabel("$p$", rotation=0, fontsize=14)
-plt.title("Hamiltonian ODE NN", pad=10)
+plt.title("Hamiltonian ODE NN ({})".format(args.num_points), pad=10)
 
 plt.tight_layout() ; plt.show()
-fig.savefig('{}/pend.{}'.format(args.fig_dir, FORMAT))
+fig.savefig('{}/pend-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
 
 #%% [markdown]
 # ## Quantitative analysis
@@ -262,15 +259,15 @@ fig = plt.figure(figsize=[12,3], dpi=DPI)
 plt.subplot(1,4,1)
 plt.title("Predictions", pad=tpad) ; plt.xlabel('$q$') ; plt.ylabel('$p$')
 plt.plot(true_x[:,0], true_x[:,1], 'k-', label='Ground truth', linewidth=2)
-plt.plot(base_x[:,0], base_x[:,1], 'r-', label='Baseline ODE NN', linewidth=2)
+plt.plot(base_x[:,0], base_x[:,1], 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.plot(hnn_x[:,0], hnn_x[:,1], 'b-', label='Hamiltonian ODE NN', linewidth=2)
 plt.xlim(-2.5,4) ; plt.ylim(-2.5,4)
 plt.legend(fontsize=7)
 
 plt.subplot(1,4,2)
 plt.title("MSE between coordinates", pad=tpad) ; plt.xlabel('Time step')
-plt.plot(t_eval, ((true_x-base_x)**2).mean(-1), 'r-', label='Baseline ODE NN', linewidth=2)
-plt.plot(t_eval, ((true_x-hnn_x)**2).mean(-1), 'b-', label='Hamiltonian ODE NN', linewidth=2)
+plt.plot(t_eval, ((true_x-base_x)**2).mean(-1), 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
+plt.plot(t_eval, ((true_x-hnn_x)**2).mean(-1), 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.legend(fontsize=7)
 
 plt.subplot(1,4,3)
@@ -280,8 +277,8 @@ true_hq = hnn_ode_model(torch.Tensor(true_x).to(device)).detach().cpu().numpy().
 base_hq = hnn_ode_model(torch.Tensor(base_x).to(device)).detach().cpu().numpy().squeeze()
 hnn_hq = hnn_ode_model(torch.Tensor(hnn_x).to(device)).detach().cpu().numpy().squeeze()
 plt.plot(t_eval, true_hq, 'k-', label='Ground truth', linewidth=2)
-plt.plot(t_eval, base_hq, 'r-', label='Baseline ODE NN', linewidth=2)
-plt.plot(t_eval, hnn_hq, 'b-', label='Hamiltonian ODE NN', linewidth=2)
+plt.plot(t_eval, base_hq, 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
+plt.plot(t_eval, hnn_hq, 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.legend(fontsize=7)
 
 plt.subplot(1,4,4)
@@ -291,12 +288,12 @@ true_e = np.stack([hamiltonian_fn(c) for c in true_x])
 base_e = np.stack([hamiltonian_fn(c) for c in base_x])
 hnn_e = np.stack([hamiltonian_fn(c) for c in hnn_x])
 plt.plot(t_eval, true_e, 'k-', label='Ground truth', linewidth=2)
-plt.plot(t_eval, base_e, 'r-', label='Baseline ODE NN', linewidth=2)
-plt.plot(t_eval, hnn_e, 'b-', label='Hamiltonian ODE NN', linewidth=2)
+plt.plot(t_eval, base_e, 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
+plt.plot(t_eval, hnn_e, 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.legend(fontsize=7)
 
 plt.tight_layout() ; plt.show()
-fig.savefig('{}/pend-integration.{}'.format(args.fig_dir, FORMAT))
+fig.savefig('{}/pend-p{}-integration.{}'.format(args.fig_dir, args.num_points, FORMAT))
 
 
 #%%

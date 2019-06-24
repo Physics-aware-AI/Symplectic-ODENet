@@ -85,8 +85,8 @@ def arrange_data(x, t, num_points=2):
             x_stack.append(x[i:-num_points+i+1,:,:])
         else:
             x_stack.append(x[i:,:,:])
-    x_stack = torch.stack(x_stack)
-    x_stack = torch.reshape(x_stack, 
+    x_stack = np.stack(x_stack)
+    x_stack = np.reshape(x_stack, 
                 (num_points, -1, x.shape[2]))
     t_eval = t[0:num_points]
     return x_stack, t_eval

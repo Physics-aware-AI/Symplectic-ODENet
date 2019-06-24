@@ -29,17 +29,14 @@ def get_args():
     parser.add_argument('--verbose', dest='verbose', action='store_true', help='verbose?')
     parser.add_argument('--seed', default=0, type=int, help='random seed')
     parser.add_argument('--save_dir', default=THIS_DIR, type=str, help='where to save the trained model')
-    parser.add_argument('--adjoint', action='store_true')
-    parser.add_argument('--gpu', type=int, default=3)
+    parser.add_argument('--gpu', type=int, default=0)
+    parser.add_argument('--num_points', type=int, default=2, help='number of evaluation points by the ODE solver, including the initial point')
     parser.set_defaults(feature=True)
     return parser.parse_args()
 
 def train(args):
     # import ODENet
-    if args.adjoint:
-        from torchdiffeq import odeint_adjoint as odeint
-    else:
-        from torchdiffeq import odeint
+    from torchdiffeq import odeint
 
     device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 
@@ -51,7 +48,8 @@ def train(args):
 
     # init model and optimizer
     if args.verbose:
-        print("Training baseline model:" if args.baseline else "Training HNN_ODE model:")
+        print("Training baseline ODE model with num of points = {}:".format(args.num_points) if args.baseline 
+            else "Training HNN ODE model with num of points = {}:".format(args.num_points))
 
     output_dim = args.input_dim if args.baseline else 1
     nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
@@ -60,11 +58,13 @@ def train(args):
 
     # arrange data
     data = get_dataset(seed=args.seed)
-    train_x = torch.tensor(data['x'], requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
-    test_x = torch.tensor(data['test_x'], requires_grad=True, dtype=torch.float32).to(device)
-    t_eval = torch.tensor(data['t'], requires_grad=True, dtype=torch.float32).to(device)
-    train_x, t_eval = arrange_data(train_x, t_eval, num_points=3)
-    test_x, t_eval = arrange_data(test_x, t_eval, num_points=3)
+    train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
+    test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
+
+    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
+    test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
+    t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
+
     # odenet wrapper for the adjoint method
     # class ODEFun(torch.nn.Module):
     #     def __init__(self, time_derivative):
@@ -121,9 +121,9 @@ if __name__ == "__main__":
 
     # save 
     os.makedirs(args.save_dir) if not os.path.exists(args.save_dir) else None
-    label = '-baseline' if args.baseline else '-hnn_ode'
-    path = '{}/{}{}.tar'.format(args.save_dir, args.name, label)
+    label = '-baseline_ode' if args.baseline else '-hnn_ode'
+    path = '{}/{}{}-p{}.tar'.format(args.save_dir, args.name, label, args.num_points)
     torch.save(model.state_dict(), path)
 
-    path = '{}/{}{}-stats.pkl'.format(args.save_dir, args.name, label)
+    path = '{}/{}{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, args.num_points)
     to_pickle(stats, path)
