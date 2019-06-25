@@ -39,3 +39,7 @@ $\dot{p} = -\frac{\partial H}{\partial q}$
 
 ![image](figures/pend-p5.png)
 ![image](figures/pend-p5-integration.png)
+
+## Try to add structure to the ODENet
+
+It takes some trial and error to figure out how to implement the mass matrix structure into the network. 

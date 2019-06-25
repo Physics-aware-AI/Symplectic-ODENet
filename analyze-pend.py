@@ -12,7 +12,7 @@ sys.path.append(EXPERIMENT_DIR)
 
 from data import get_dataset, get_field, get_trajectory, dynamics_fn, hamiltonian_fn, arrange_data
 from nn_models import MLP
-from hnn import HNN
+from hnn import HNN, HNN_structure
 from utils import L2_loss, from_pickle
 
 # #%%
@@ -89,14 +89,20 @@ plt.tight_layout() ; plt.show()
 
 #%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
-def get_model(args, baseline, num_points):
-    output_dim = args.input_dim if baseline else 1
-    nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-    model = HNN(args.input_dim, differentiale_model=nn_model, 
-        device=device, baseline=baseline).to(device)
+def get_model(args, baseline, structure, num_points):
+    if structure == False:
+        output_dim = args.input_dim if baseline else 1
+        nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
+        model = HNN(args.input_dim, differentiale_model=nn_model, 
+                device=device, baseline=baseline).to(device)
+    else:
+        L_net = MLP(input_dim=1, hidden_dim=141, output_dim=1, nonlinearity=args.nonlinearity).to(device)
+        V_net = MLP(input_dim=1, hidden_dim=141, output_dim=1, nonlinearity=args.nonlinearity).to(device)
+        model = HNN_structure(args.input_dim, L_net, V_net, device=device)
     
     model_name = 'baseline_ode' if baseline else 'hnn_ode'
-    path = '{}pend-{}-p{}.tar'.format(args.save_dir, model_name, num_points)
+    struct = '-struct' if structure else ''
+    path = '{}pend-{}{}-p{}.tar'.format(args.save_dir, model_name, struct, num_points)
     model.load_state_dict(torch.load(path, map_location=device))
     return model
 
@@ -132,8 +138,9 @@ def integrate_model(model, t_span, y0, **kwargs):
 # ## Run analysis
 
 #%%
-base_ode_model = get_model(args, baseline=True, num_points=args.num_points)
-hnn_ode_model = get_model(args, baseline=False, num_points=args.num_points)
+base_ode_model = get_model(args, baseline=True, structure=False, num_points=args.num_points)
+hnn_ode_model = get_model(args, baseline=False, structure=False, num_points=args.num_points)
+hnn_ode_struct_model = get_model(args, baseline=False, structure=True, num_points=args.num_points)
 
 # get their vector fields
 R = 2.6
@@ -141,6 +148,7 @@ field = get_field(xmin=-R, xmax=R, ymin=-R, ymax=R, gridsize=args.gridsize)
 # data = get_dataset(radius=2.0)
 base_field = get_vector_field(base_ode_model, xmin=-R, xmax=R, ymin=-R, ymax=R, gridsize=args.gridsize)
 hnn_field = get_vector_field(hnn_ode_model, xmin=-R, xmax=R, ymin=-R, ymax=R, gridsize=args.gridsize)
+hnn_struct_field = get_vector_field(hnn_ode_struct_model, xmin=-R, xmax=R, ymin=-R, ymax=R, gridsize=args.gridsize)
 
 # integrate along those fields starting from point (1,0)
 t_span = [0,28]
@@ -155,20 +163,21 @@ y0 = np.asarray([2.1, 0])
 kwargs = {'t_eval': np.linspace(t_span[0], t_span[1], 1000), 'rtol': 1e-12}
 base_ivp = integrate_model(base_ode_model, t_span, y0, **kwargs)
 hnn_ivp = integrate_model(hnn_ode_model, t_span, y0, **kwargs)
+hnn_struct_ivp = integrate_model(hnn_ode_struct_model, t_span, y0, **kwargs)
 
 
 #%%
 ###### PLOT ######
-fig = plt.figure(figsize=(11.3, 3.2), facecolor='white', dpi=DPI)
+fig = plt.figure(figsize=(16, 3.2), facecolor='white', dpi=DPI)
 # plot physical system
-fig.add_subplot(1, 4, 1, frameon=True) 
+fig.add_subplot(1, 5, 1, frameon=True) 
 plt.xticks([]) ;  plt.yticks([])
 schema = mpimg.imread(EXPERIMENT_DIR + '/pendulum.png')
 plt.imshow(schema)
 plt.title("Pendulum system", pad=10)
 
 # plot dynamics
-fig.add_subplot(1, 4, 2, frameon=True)
+fig.add_subplot(1, 5, 2, frameon=True)
 x, y, dx, dy, t = get_trajectory(t_span=[0,4], radius=2.1, y0=y0)
 N = len(x)
 point_colors = [(i/N, 0, 1-i/N) for i in range(N)]
@@ -181,7 +190,7 @@ plt.ylabel("$p$", rotation=0, fontsize=14)
 plt.title("Data", pad=10)
 
 # plot baseline
-fig.add_subplot(1, 4, 3, frameon=True)
+fig.add_subplot(1, 5, 3, frameon=True)
 plt.quiver(field['x'][:,0], field['x'][:,1], base_field[:,0], base_field[:,1],
         cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.5,.5,.5))
 
@@ -194,7 +203,7 @@ plt.ylabel("$p$", rotation=0, fontsize=14)
 plt.title("Baseline ODE NN ({})".format(args.num_points), pad=10)
 
 # plot HNN
-fig.add_subplot(1, 4, 4, frameon=True)
+fig.add_subplot(1, 5, 4, frameon=True)
 plt.quiver(field['x'][:,0], field['x'][:,1], hnn_field[:,0], hnn_field[:,1],
         cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.5,.5,.5))
 
@@ -205,6 +214,19 @@ for i, l in enumerate(np.split(hnn_ivp['y'].T, LINE_SEGMENTS)):
 plt.xlabel("$q$", fontsize=14)
 plt.ylabel("$p$", rotation=0, fontsize=14)
 plt.title("Hamiltonian ODE NN ({})".format(args.num_points), pad=10)
+
+# plot HNN structure
+fig.add_subplot(1, 5, 5, frameon=True)
+plt.quiver(field['x'][:,0], field['x'][:,1], hnn_struct_field[:,0], hnn_struct_field[:,1],
+        cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.5,.5,.5))
+
+for i, l in enumerate(np.split(hnn_struct_ivp['y'].T, LINE_SEGMENTS)):
+    color = (float(i)/LINE_SEGMENTS, 0, 1-float(i)/LINE_SEGMENTS)
+    plt.plot(l[:,0],l[:,1],color=color, linewidth=LINE_WIDTH)
+
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Hamiltonian structured ODE NN ({})".format(args.num_points), pad=10)
 
 plt.tight_layout() ; plt.show()
 fig.savefig('{}/pend-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
@@ -231,8 +253,13 @@ def integrate_models(x0=np.asarray([1, 0]), t_span=[0,5], t_eval=None):
     hnn_path = integrate_model(hnn_ode_model, t_span, x0, **kwargs)
     hnn_x = hnn_path['y'].T
     _tmp = torch.tensor( true_x, requires_grad=True, dtype=torch.float32)
-    
-    return true_x, base_x, hnn_x
+
+    # integrate along HNN vector field
+    hnn_struct_path = integrate_model(hnn_ode_struct_model, t_span, x0, **kwargs)
+    hnn_struct_x = hnn_struct_path['y'].T
+    _tmp = torch.tensor( true_x, requires_grad=True, dtype=torch.float32)
+
+    return true_x, base_x, hnn_x, hnn_struct_x
 
 def vector_field_loss(x, dx_hat):
     dx = circular_vector_field(t=None, x=x)
@@ -248,9 +275,9 @@ def energy_loss(true_x, integrated_x):
 x0 = np.asarray([2.1, 0])
 
 # integration
-t_span=[0,20]
+t_span=[0,40]
 t_eval = np.linspace(t_span[0], t_span[1], 2000)
-true_x, base_x, hnn_x = integrate_models(x0=x0, t_span=t_span, t_eval=t_eval)
+true_x, base_x, hnn_x, hnn_struct_x = integrate_models(x0=x0, t_span=t_span, t_eval=t_eval)
 
 # plotting
 tpad = 7
@@ -261,6 +288,7 @@ plt.title("Predictions", pad=tpad) ; plt.xlabel('$q$') ; plt.ylabel('$p$')
 plt.plot(true_x[:,0], true_x[:,1], 'k-', label='Ground truth', linewidth=2)
 plt.plot(base_x[:,0], base_x[:,1], 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.plot(hnn_x[:,0], hnn_x[:,1], 'b-', label='Hamiltonian ODE NN', linewidth=2)
+plt.plot(hnn_struct_x[:,0], hnn_struct_x[:,1], 'g-', label='Hamiltonian structured ODE NN', linewidth=2)
 plt.xlim(-2.5,4) ; plt.ylim(-2.5,4)
 plt.legend(fontsize=7)
 
@@ -268,17 +296,20 @@ plt.subplot(1,4,2)
 plt.title("MSE between coordinates", pad=tpad) ; plt.xlabel('Time step')
 plt.plot(t_eval, ((true_x-base_x)**2).mean(-1), 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.plot(t_eval, ((true_x-hnn_x)**2).mean(-1), 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
+plt.plot(t_eval, ((true_x-hnn_struct_x)**2).mean(-1), 'g-', label='Hamiltonian structured ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.legend(fontsize=7)
 
 plt.subplot(1,4,3)
-plt.title("Total HNN-conserved quantity", pad=tpad)
+plt.title("Total HNN_ODE-conserved quantity", pad=tpad)
 plt.xlabel('Time step')
 true_hq = hnn_ode_model(torch.Tensor(true_x).to(device)).detach().cpu().numpy().squeeze()
 base_hq = hnn_ode_model(torch.Tensor(base_x).to(device)).detach().cpu().numpy().squeeze()
 hnn_hq = hnn_ode_model(torch.Tensor(hnn_x).to(device)).detach().cpu().numpy().squeeze()
+hnn_struct_hq = hnn_ode_model(torch.Tensor(hnn_struct_x).to(device)).detach().cpu().numpy().squeeze()
 plt.plot(t_eval, true_hq, 'k-', label='Ground truth', linewidth=2)
 plt.plot(t_eval, base_hq, 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.plot(t_eval, hnn_hq, 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
+plt.plot(t_eval, hnn_struct_hq, 'g-', label='Hamiltonian structured ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.legend(fontsize=7)
 
 plt.subplot(1,4,4)
@@ -287,9 +318,11 @@ plt.xlabel('Time step')
 true_e = np.stack([hamiltonian_fn(c) for c in true_x])
 base_e = np.stack([hamiltonian_fn(c) for c in base_x])
 hnn_e = np.stack([hamiltonian_fn(c) for c in hnn_x])
+hnn_struct_e = np.stack([hamiltonian_fn(c) for c in hnn_struct_x])
 plt.plot(t_eval, true_e, 'k-', label='Ground truth', linewidth=2)
 plt.plot(t_eval, base_e, 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.plot(t_eval, hnn_e, 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
+plt.plot(t_eval, hnn_struct_e, 'g-', label='Hamiltonian structured ODE NN ({})'.format(args.num_points), linewidth=2)
 plt.legend(fontsize=7)
 
 plt.tight_layout() ; plt.show()

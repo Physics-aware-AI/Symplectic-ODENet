@@ -10,7 +10,7 @@ PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PARENT_DIR)
 
 from nn_models import MLP
-from hnn import HNN
+from hnn import HNN, HNN_structure
 from data import get_dataset, arrange_data
 from utils import L2_loss, to_pickle
 
@@ -31,6 +31,7 @@ def get_args():
     parser.add_argument('--save_dir', default=THIS_DIR, type=str, help='where to save the trained model')
     parser.add_argument('--gpu', type=int, default=0)
     parser.add_argument('--num_points', type=int, default=2, help='number of evaluation points by the ODE solver, including the initial point')
+    parser.add_argument('--structure', dest='structure', action='store_true', help='using a structured Hamiltonian')
     parser.set_defaults(feature=True)
     return parser.parse_args()
 
@@ -50,10 +51,20 @@ def train(args):
     if args.verbose:
         print("Training baseline ODE model with num of points = {}:".format(args.num_points) if args.baseline 
             else "Training HNN ODE model with num of points = {}:".format(args.num_points))
+        if args.structure:
+            print("using the structured Hamiltonian \n")
 
-    output_dim = args.input_dim if args.baseline else 1
-    nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-    model = HNN(args.input_dim, differentiale_model=nn_model, device=device, baseline=args.baseline).to(device)
+    if args.structure == False:
+        output_dim = args.input_dim if args.baseline else 1
+        nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
+        model = HNN(args.input_dim, differentiale_model=nn_model, device=device, baseline=args.baseline).to(device)
+    elif args.structure and args.baseline == False:
+        L_net = MLP(input_dim=1, hidden_dim=141, output_dim=1, nonlinearity=args.nonlinearity).to(device)
+        V_net = MLP(input_dim=1, hidden_dim=141, output_dim=1, nonlinearity=args.nonlinearity).to(device)
+        model = HNN_structure(args.input_dim, L_net, V_net, device=device)
+    else:
+        raise RuntimeError('argument *baseline* and *structure* cannot both be true')
+    
     optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
     # arrange data
@@ -79,7 +90,7 @@ def train(args):
     for step in range(args.total_steps+1):
         # train step
         t = time.time()
-        train_x_hat = odeint(model.time_derivative, train_x[0, :, :], t_eval, method='dopri5')
+        train_x_hat = odeint(model.time_derivative, train_x[0, :, :], t_eval, method='rk4')
         forward_time = time.time() - t
         loss = L2_loss(train_x, train_x_hat)
 
@@ -88,7 +99,7 @@ def train(args):
         backward_time = time.time() - t
         
         # run test data
-        test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='dopri5')
+        test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='rk4')
         test_loss = L2_loss(test_x, test_x_hat)
 
         # logging
@@ -122,8 +133,9 @@ if __name__ == "__main__":
     # save 
     os.makedirs(args.save_dir) if not os.path.exists(args.save_dir) else None
     label = '-baseline_ode' if args.baseline else '-hnn_ode'
-    path = '{}/{}{}-p{}.tar'.format(args.save_dir, args.name, label, args.num_points)
+    struct = '-struct' if args.structure else ''
+    path = '{}/{}{}{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points)
     torch.save(model.state_dict(), path)
 
-    path = '{}/{}{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, args.num_points)
+    path = '{}/{}{}{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.num_points)
     to_pickle(stats, path)
