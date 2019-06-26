@@ -56,7 +56,7 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 2,
+         'num_points': 4,
          'gpu': 0}
 
 class ObjectView(object):
@@ -328,5 +328,64 @@ plt.legend(fontsize=7)
 plt.tight_layout() ; plt.show()
 fig.savefig('{}/pend-p{}-integration.{}'.format(args.fig_dir, args.num_points, FORMAT))
 
+
+#%%
+
+# plotting the difference between trajectories
+tpad = 7
+pts = 500
+pte = 1000
+fig = plt.figure(figsize=[12, 4], dpi=DPI)
+plt.subplot(1,3,1)
+plt.title("True and Baseline", pad=tpad) ; plt.xlabel('t')
+plt.plot(t_eval[pts:pte], true_x[pts:pte,0], t_eval[pts:pte], true_x[pts:pte,1], 'g-')
+plt.plot(t_eval[pts:pte], base_x[pts:pte,0], '--', t_eval[pts:pte], base_x[pts:pte,1], 'b--')
+
+plt.subplot(1,3,2)
+plt.title("True and HNN ODE", pad=tpad) ; plt.xlabel('t')
+plt.plot(t_eval[pts:pte], true_x[pts:pte,0], t_eval[pts:pte], true_x[pts:pte,1], 'g-')
+plt.plot(t_eval[pts:pte], hnn_x[pts:pte,0], '--', t_eval[pts:pte], hnn_x[pts:pte,1], 'b--')
+
+plt.subplot(1,3,3)
+plt.title("True and Structured HNN ODE", pad=tpad) ; plt.xlabel('t')
+plt.plot(t_eval[pts:pte], true_x[pts:pte,0], t_eval[pts:pte], true_x[pts:pte,1], 'g-')
+plt.plot(t_eval[pts:pte], hnn_struct_x[pts:pte,0], '--', t_eval[pts:pte], hnn_struct_x[pts:pte,1], 'b--')
+
+#%%
+
+# plot some statistics
+# #%%
+# pend_baseline_stats = from_pickle(EXPERIMENT_DIR + 'pend-baseline-stats.pkl')
+# baseline_nfe = np.array(pend_baseline_stats['nfe'])
+# baseline_diff_nfe = baseline_nfe[1:] - baseline_nfe[:-1]
+# baseline_forward_time = np.array(pend_baseline_stats['forward_time'])
+# baseline_backward_time = np.array(pend_baseline_stats['backward_time'])
+
+def get_stats(args, baseline, structure, num_points):
+    model_name = 'baseline_ode' if baseline else 'hnn_ode'
+    struct = '-struct' if structure else ''
+    path = EXPERIMENT_DIR + 'pend-{}{}-p{}-stats.pkl'.format(model_name, struct, args.num_points)
+    model_stats = from_pickle(path)
+    return model_stats
+
+base_ode_stats = get_stats(args, baseline=True, structure=False, num_points=args.num_points)
+hnn_ode_stats = get_stats(args, baseline=False, structure=False, num_points=args.num_points)
+hnn_ode_struct_stats = get_stats(args, baseline=False, structure=True, num_points=args.num_points)
+
+fig = plt.figure(figsize=[12, 4], dpi=DPI)
+plt.subplot(1,3,1)
+plt.title("Baseline", pad = tpad) ; plt.xlabel('epochs')
+plt.plot(np.array(base_ode_stats['train_loss'])[0:500])
+plt.plot(np.array(base_ode_stats['test_loss'])[0:500])
+
+plt.subplot(1,3,2)
+plt.title("HNN ODE", pad=tpad) ; plt.xlabel('epochs')
+plt.plot(np.array(hnn_ode_stats['train_loss'])[0:500])
+plt.plot(np.array(hnn_ode_stats['test_loss'])[0:500])
+
+plt.subplot(1,3,3)
+plt.title("Structured HNN ODE", pad=tpad) ; plt.xlabel('epochs')
+plt.plot(np.array(hnn_ode_struct_stats['train_loss'])[0:500])
+plt.plot(np.array(hnn_ode_struct_stats['test_loss'])[0:500])
 
 #%%

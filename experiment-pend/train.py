@@ -90,7 +90,7 @@ def train(args):
     for step in range(args.total_steps+1):
         # train step
         t = time.time()
-        train_x_hat = odeint(model.time_derivative, train_x[0, :, :], t_eval, method='rk4')
+        train_x_hat = odeint(model.time_derivative, train_x[0, :, :], t_eval, method='dopri5')
         forward_time = time.time() - t
         loss = L2_loss(train_x, train_x_hat)
 
@@ -99,7 +99,7 @@ def train(args):
         backward_time = time.time() - t
         
         # run test data
-        test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='rk4')
+        test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='dopri5')
         test_loss = L2_loss(test_x, test_x_hat)
 
         # logging

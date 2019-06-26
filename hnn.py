@@ -72,9 +72,9 @@ class HNN_structure(torch.nn.Module):
         q, p = torch.chunk(x, 2, dim=1)
         L = self.L_net(q)
         V_q = self.V_net(q)
-        M_q = L * L 
+        M_q = L * L + 0.1
 
-        H = p * p * M_q /2 + V_q
+        H = p * p / M_q /2 + V_q
         return H
         # return p * p/ (2*self.L_net(q)*self.L_net(q)) + self.V_net(q)
 

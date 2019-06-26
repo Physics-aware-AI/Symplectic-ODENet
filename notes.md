@@ -25,21 +25,24 @@ $\dot{p} = -\frac{\partial H}{\partial q}$
 ![image](figures/pend-p2.png)
 ![image](figures/pend-p2-integration.png)
 
-### Adding ODENet to HNN, training set $(q,p)$, evaluate 3 poitns
+### Adding ODENet to HNN, training set $(q,p)$, evaluate 3 points
 
 ![image](figures/pend-p3.png)
 ![image](figures/pend-p3-integration.png)
 
-### Adding ODENet to HNN, training set $(q,p)$, evaluate 4 poitns
+### Adding ODENet to HNN, training set $(q,p)$, evaluate 4 points
 
 ![image](figures/pend-p4.png)
 ![image](figures/pend-p4-integration.png)
 
-### Adding ODENet to HNN, training set $(q,p)$, evaluate 3 poitns
+### Adding ODENet to HNN, training set $(q,p)$, evaluate 5 points
 
 ![image](figures/pend-p5.png)
 ![image](figures/pend-p5-integration.png)
 
 ## Try to add structure to the ODENet
 
-It takes some trial and error to figure out how to implement the mass matrix structure into the network. 
+It takes some trial and error to figure out how to implement the mass matrix structure into the network, even in the 1D case
+- First I parametrize the mass matrix as $M = L * L$. Since mass shows up in the denominator. in other words, mass inverse shows up. This scheme would cause issue in the traning procedure. My guess is that it's numerically unstable and some weights blow up
+- Next I try to add a constant to the mass $ M = L * L + 0.1$. I think the positive constant stablized the process and the results are satisfatory.
+- Biswa suggested learning the inverse of mass directly. so I tried $H = p * p * M_q /2 + V_q$ instead of $H = p * p / M_q /2 + V_q$, with $M = L * L$. Training looks correct but we actually learnt the wrong vector field.
