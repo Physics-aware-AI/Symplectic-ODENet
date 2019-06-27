@@ -3,3 +3,4 @@ __pycache__
 *.tar
 *.pkl
 .vscode/
+scratch.py

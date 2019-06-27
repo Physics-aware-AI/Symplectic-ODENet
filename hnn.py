@@ -9,7 +9,8 @@ from nn_models import MLP
 
 class HNN(torch.nn.Module):
     def __init__(self, input_dim, differentiale_model, device,
-                    baseline=False, assume_canonical_coords=True):
+                    baseline=False, assume_canonical_coords=True,
+                    damp=False, dampNet=None):
         super(HNN, self).__init__()
         self.baseline = baseline
         self.differentiale_model = differentiale_model
@@ -17,6 +18,10 @@ class HNN(torch.nn.Module):
         self.device = device
         self.M = self.permutation_tensor(input_dim)
         self.nfe = 0
+        self.damp = damp
+
+        if damp:
+            self.dampNet = dampNet
         
 
     def forward(self, x):
@@ -24,7 +29,7 @@ class HNN(torch.nn.Module):
             return self.differentiale_model(x)
         else:
             y = self.differentiale_model(x)
-            assert y.dim() == 2 and y.shape[1] == 1
+            # assert y.dim() == 2 and y.shape[1] == 1
             return y
 
     # note that the input of this function has changed to meet the ODENet requirement.
@@ -35,8 +40,19 @@ class HNN(torch.nn.Module):
         else:
             H = self.forward(x) # the Hamiltonian
             dH = torch.autograd.grad(H.sum(), x, create_graph=True)[0]
-            vector_field = torch.matmul(dH, self.M.t())
-            return vector_field
+            H_vector_field = torch.matmul(dH, self.M.t())
+            if not self.damp:
+                return H_vector_field
+            else:
+                D = self.dampNet(x) # (100, 2, 2)
+                D_vector_field = torch.squeeze(
+                    torch.matmul(
+                        torch.unsqueeze(dH, 1),
+                        D # should be transpose but symmetric
+                    )
+                )
+                return H_vector_field - D_vector_field
+
 
 
     def permutation_tensor(self, n):

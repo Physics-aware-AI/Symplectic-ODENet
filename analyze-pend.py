@@ -333,8 +333,8 @@ fig.savefig('{}/pend-p{}-integration.{}'.format(args.fig_dir, args.num_points, F
 
 # plotting the difference between trajectories
 tpad = 7
-pts = 500
-pte = 1000
+pts = 1500
+pte = 2000
 fig = plt.figure(figsize=[12, 4], dpi=DPI)
 plt.subplot(1,3,1)
 plt.title("True and Baseline", pad=tpad) ; plt.xlabel('t')
@@ -388,4 +388,94 @@ plt.title("Structured HNN ODE", pad=tpad) ; plt.xlabel('epochs')
 plt.plot(np.array(hnn_ode_struct_stats['train_loss'])[0:500])
 plt.plot(np.array(hnn_ode_struct_stats['test_loss'])[0:500])
 
+
 #%%
+
+# figure for Biswa
+###### PLOT ######
+fig = plt.figure(figsize=(6, 3.2), facecolor='white', dpi=DPI)
+# plot physical system
+fig.add_subplot(1, 2, 1, frameon=True) 
+plt.xticks([]) ;  plt.yticks([])
+schema = mpimg.imread(EXPERIMENT_DIR + '/pendulum.png')
+plt.imshow(schema)
+plt.title("Pendulum system", pad=10)
+
+# plot dynamics
+fig.add_subplot(1, 2, 2, frameon=True)
+x, y, dx, dy, t = get_trajectory(t_span=[0,4], radius=2.1, y0=y0)
+N = len(x)
+point_colors = [(i/N, 0, 1-i/N) for i in range(N)]
+plt.scatter(x,y, s=14, label='data', c=point_colors)
+
+plt.quiver(field['x'][:,0], field['x'][:,1], field['dx'][:,0], field['dx'][:,1],
+        cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.2,.2,.2))  
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Data", pad=10)
+
+plt.tight_layout() ; plt.show()
+fig.savefig('{}/pend-p{}-to-Biswa.{}'.format(args.fig_dir, args.num_points, FORMAT))
+
+#%%
+
+# plot for Biswa
+
+fig = plt.figure(figsize=(9.6, 6.4), facecolor='white', dpi=DPI)
+
+# plot baseline
+fig.add_subplot(2, 3, 1, frameon=True)
+plt.quiver(field['x'][:,0], field['x'][:,1], base_field[:,0], base_field[:,1],
+        cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.5,.5,.5))
+
+for i, l in enumerate(np.split(base_ivp['y'].T, LINE_SEGMENTS)):
+    color = (float(i)/LINE_SEGMENTS, 0, 1-float(i)/LINE_SEGMENTS)
+    plt.plot(l[:,0],l[:,1],color=color, linewidth=LINE_WIDTH)
+    
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Baseline ODE NN ({})".format(args.num_points), pad=10)
+
+# plot HNN
+fig.add_subplot(2, 3, 2, frameon=True)
+plt.quiver(field['x'][:,0], field['x'][:,1], hnn_field[:,0], hnn_field[:,1],
+        cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.5,.5,.5))
+
+for i, l in enumerate(np.split(hnn_ivp['y'].T, LINE_SEGMENTS)):
+    color = (float(i)/LINE_SEGMENTS, 0, 1-float(i)/LINE_SEGMENTS)
+    plt.plot(l[:,0],l[:,1],color=color, linewidth=LINE_WIDTH)
+
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Hamiltonian ODE NN ({})".format(args.num_points), pad=10)
+
+# plot HNN structure
+fig.add_subplot(2, 3, 3, frameon=True)
+plt.quiver(field['x'][:,0], field['x'][:,1], hnn_struct_field[:,0], hnn_struct_field[:,1],
+        cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.5,.5,.5))
+
+for i, l in enumerate(np.split(hnn_struct_ivp['y'].T, LINE_SEGMENTS)):
+    color = (float(i)/LINE_SEGMENTS, 0, 1-float(i)/LINE_SEGMENTS)
+    plt.plot(l[:,0],l[:,1],color=color, linewidth=LINE_WIDTH)
+
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Hamiltonian structured ODE NN ({})".format(args.num_points), pad=10)
+
+plt.subplot(2,3,4)
+plt.title("True and Baseline", pad=tpad) ; plt.xlabel('t')
+plt.plot(t_eval[pts:pte], true_x[pts:pte,0], t_eval[pts:pte], true_x[pts:pte,1], 'g-')
+plt.plot(t_eval[pts:pte], base_x[pts:pte,0], '--', t_eval[pts:pte], base_x[pts:pte,1], 'b--')
+
+plt.subplot(2,3,5)
+plt.title("True and HNN ODE", pad=tpad) ; plt.xlabel('t')
+plt.plot(t_eval[pts:pte], true_x[pts:pte,0], t_eval[pts:pte], true_x[pts:pte,1], 'g-')
+plt.plot(t_eval[pts:pte], hnn_x[pts:pte,0], '--', t_eval[pts:pte], hnn_x[pts:pte,1], 'b--')
+
+plt.subplot(2,3,6)
+plt.title("True and Structured HNN ODE", pad=tpad) ; plt.xlabel('t')
+plt.plot(t_eval[pts:pte], true_x[pts:pte,0], t_eval[pts:pte], true_x[pts:pte,1], 'g-')
+plt.plot(t_eval[pts:pte], hnn_struct_x[pts:pte,0], '--', t_eval[pts:pte], hnn_struct_x[pts:pte,1], 'b--')
+
+plt.tight_layout() ; plt.show()
+fig.savefig('{}/pend-p{}-traj-to-Biswa.{}'.format(args.fig_dir, args.num_points, FORMAT))
