@@ -10,6 +10,9 @@ solve_ivp = scipy.integrate.solve_ivp
 def L2_loss(u, v):
     return (u-v).pow(2).mean()
 
+def abs_loss(u, v):
+    return torch.abs(u-v).mean()
+
 def read_lipson(experiment_name, save_dir):
     desired_file = experiment_name + ".txt"
     with zipfile.ZipFile('{}/invar_datasets.zip'.format(save_dir)) as z:

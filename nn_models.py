@@ -12,7 +12,7 @@ class MLP(torch.nn.Module):
         super(MLP, self).__init__()
         self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
         self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = torch.nn.Linear(hidden_dim, output_dim, bias=None)
+        self.linear3 = torch.nn.Linear(hidden_dim, output_dim)
 
         for l in [self.linear1, self.linear2, self.linear3]:
             torch.nn.init.orthogonal_(l.weight) # use a principled initialization
@@ -65,23 +65,26 @@ class PSD(torch.nn.Module):
 
 class DampMatrix(torch.nn.Module):
     '''A Neural Net which outputs a 2*2 damping matrix'''
-    def __init__(self, input_dim, hidden_dim, diag_dim, nonlinearity='tanh'):
+    def __init__(self, input_dim, hidden_dim, diag_dim, device, nonlinearity='tanh'):
         super(DampMatrix, self).__init__()
         assert diag_dim > 1
         self.linear1 = torch.nn.Linear(int(input_dim/2), hidden_dim)
         self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = torch.nn.Linear(hidden_dim, 4, bias=None)
+        self.linear3 = torch.nn.Linear(hidden_dim, 1, bias=None)
 
         for l in [self.linear1, self.linear2, self.linear3]:
             torch.nn.init.orthogonal_(l.weight) # use a principled initialization
         
         self.nonlinearity = choose_nonlinearity(nonlinearity)
+        self.device = device
 
     def forward(self, x):
         bs = x.shape[0]
         q, p = torch.split(x, 1, dim=1)
-        h = self.nonlinearity( self.linear1(q) )
+        h = self.nonlinearity( self.linear1(torch.ones(1).to(self.device)) )
         h = self.nonlinearity( self.linear2(h) )
-        D = self.nonlinearity( self.linear3(h) )
-        D = torch.reshape(D, (-1,2,2))
+        d = self.nonlinearity( self.linear3(h) )
+        # D = torch.reshape(D, (-1,2,2))
+        D = torch.zeros(bs, 2, 2, device=self.device)
+        D[:, 1, 1] = d*d * torch.ones(bs).to(self.device)
         return D

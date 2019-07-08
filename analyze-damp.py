@@ -11,7 +11,7 @@ EXPERIMENT_DIR = './experiment-damp/'
 sys.path.append(EXPERIMENT_DIR)
 
 from data import get_dataset, get_field, get_trajectory, dynamics_fn, hamiltonian_fn, arrange_data
-from nn_models import MLP, PSD
+from nn_models import MLP, PSD, DampMatrix
 from hnn import HNN, HNN_structure
 from utils import L2_loss, from_pickle
 
@@ -94,8 +94,8 @@ def get_model(args, baseline, structure, damping, num_points):
         # Neural net without structure
         output_dim = args.input_dim if baseline else 1
         nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        damp_model = PSD(input_dim=args.input_dim, hidden_dim=30, 
-                    diag_dim=args.input_dim, nonlinearity=args.nonlinearity).to(device)
+        damp_model = DampMatrix(input_dim=args.input_dim, hidden_dim=10,
+                    diag_dim=args.input_dim, device=device, nonlinearity=args.nonlinearity).to(device)
         model = HNN(args.input_dim, differentiale_model=nn_model, device=device, 
                 baseline=baseline, damp=damping, dampNet=damp_model).to(device)
     elif structure and baseline == False:
@@ -185,7 +185,7 @@ plt.title("Pendulum system", pad=10)
 
 # plot dynamics
 fig.add_subplot(1, 5, 2, frameon=True)
-x, y, dx, dy, t = get_trajectory(t_span=[0,4], radius=2.1, y0=y0)
+x, y, dx, dy, t = get_trajectory(t_span=[0,4], radius=2.1, y0=y0, noise_std=0.1)
 N = len(x)
 point_colors = [(i/N, 0, 1-i/N) for i in range(N)]
 plt.scatter(x,y, s=14, label='data', c=point_colors)
@@ -195,6 +195,8 @@ plt.quiver(field['x'][:,0], field['x'][:,1], field['dx'][:,0], field['dx'][:,1],
 plt.xlabel("$q$", fontsize=14)
 plt.ylabel("$p$", rotation=0, fontsize=14)
 plt.title("Data", pad=10)
+
+plt.scatter(train_x0[:, 0], train_x0[:, 1])
 
 # plot baseline
 fig.add_subplot(1, 5, 3, frameon=True)
@@ -222,7 +224,7 @@ plt.xlabel("$q$", fontsize=14)
 plt.ylabel("$p$", rotation=0, fontsize=14)
 plt.title("Hamiltonian ODE NN ({})".format(args.num_points), pad=10)
 
-plt.scatter(train_x0[:, 0], train_x0[:, 1])
+
 
 # plot HNN damping
 fig.add_subplot(1, 5, 5, frameon=True)
@@ -294,8 +296,8 @@ tpad = 7
 fig = plt.figure(figsize=[12,3], dpi=DPI)
 plt.subplot(1,4,1)
 plt.title("Predictions", pad=tpad) ; plt.xlabel('$q$') ; plt.ylabel('$p$')
-plt.plot(true_x[:,0], true_x[:,1], 'k-', label='Ground truth', linewidth=2)
-plt.plot(base_x[:,0], base_x[:,1], 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
+plt.plot(true_x[0:950,0], true_x[0:950,1], 'k-', label='Ground truth', linewidth=2)
+# plt.plot(base_x[:,0], base_x[:,1], 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
 # plt.plot(hnn_x[:,0], hnn_x[:,1], 'b-', label='Hamiltonian ODE NN', linewidth=2)
 # plt.plot(hnn_damp_x[:,0], hnn_damp_x[:,1], 'g-', label='Hamiltonian damped ODE NN', linewidth=2)
 plt.xlim(-2.5,4) ; plt.ylim(-2.5,4)
@@ -309,19 +311,19 @@ plt.plot(t_eval, ((true_x-hnn_damp_x)**2).mean(-1), 'g-', label='Hamiltonian dam
 plt.legend(fontsize=7)
 
 plt.subplot(1,4,3)
-plt.title("Total HNN_ODE-conserved quantity", pad=tpad)
-plt.xlabel('Time step')
-true_hq = hnn_ode_model(torch.Tensor(true_x).to(device)).detach().cpu().numpy().squeeze()
-base_hq = hnn_ode_model(torch.Tensor(base_x).to(device)).detach().cpu().numpy().squeeze()
-hnn_hq = hnn_ode_model(torch.Tensor(hnn_x).to(device)).detach().cpu().numpy().squeeze()
-hnn_damp_hq = hnn_ode_model(torch.Tensor(hnn_damp_x).to(device)).detach().cpu().numpy().squeeze()
-plt.plot(t_eval, true_hq, 'k-', label='Ground truth', linewidth=2)
-plt.plot(t_eval, base_hq, 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
-plt.plot(t_eval, hnn_hq, 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
-plt.plot(t_eval, hnn_damp_hq, 'g-', label='Hamiltonian damped ODE NN ({})'.format(args.num_points), linewidth=2)
-plt.legend(fontsize=7)
+# plt.title("Total Damped_HNN_ODE-conserved quantity", pad=tpad)
+# plt.xlabel('Time step')
+# true_hq = hnn_ode_damp_model(torch.Tensor(true_x).to(device)).detach().cpu().numpy().squeeze()
+# base_hq = hnn_ode_damp_model(torch.Tensor(base_x).to(device)).detach().cpu().numpy().squeeze()
+# hnn_hq = hnn_ode_damp_model(torch.Tensor(hnn_x).to(device)).detach().cpu().numpy().squeeze()
+# hnn_damp_hq = hnn_ode_damp_model(torch.Tensor(hnn_damp_x).to(device)).detach().cpu().numpy().squeeze()
+# plt.plot(t_eval, true_hq, 'k-', label='Ground truth', linewidth=2)
+# plt.plot(t_eval, base_hq, 'r-', label='Baseline ODE NN ({})'.format(args.num_points), linewidth=2)
+# plt.plot(t_eval, hnn_hq, 'b-', label='Hamiltonian ODE NN ({})'.format(args.num_points), linewidth=2)
+# plt.plot(t_eval, hnn_damp_hq, 'g-', label='Hamiltonian damped ODE NN ({})'.format(args.num_points), linewidth=2)
+# plt.legend(fontsize=7)
 
-plt.subplot(1,4,4)
+# plt.subplot(1,4,4)
 plt.title("Total energy", pad=tpad)
 plt.xlabel('Time step')
 true_e = np.stack([hamiltonian_fn(c) for c in true_x])
@@ -359,6 +361,19 @@ plt.subplot(1,3,3)
 plt.title("True and damped HNN ODE", pad=tpad) ; plt.xlabel('t')
 plt.plot(t_eval[pts:pte], true_x[pts:pte,0], t_eval[pts:pte], true_x[pts:pte,1], 'g-')
 plt.plot(t_eval[pts:pte], hnn_damp_x[pts:pte,0], '--', t_eval[pts:pte], hnn_damp_x[pts:pte,1], 'b--')
+
+
+#%%
+
+hnn_ode_damp_model.Hamiltonian_vector(torch.tensor([np.sin(np.pi/2), -2.], requires_grad=True).to(device))
+
+#%%
+
+hnn_ode_model.Hamiltonian_vector(torch.tensor([0., -2.], requires_grad=True).to(device))
+
+#%%
+
+hnn_ode_damp_model.dampNet(torch.ones(1,2).to(device))
 
 #%%
 

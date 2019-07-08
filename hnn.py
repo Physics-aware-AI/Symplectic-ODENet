@@ -53,6 +53,11 @@ class HNN(torch.nn.Module):
                 )
                 return H_vector_field - D_vector_field
 
+    def Hamiltonian_vector(self, x):
+        H = self.forward(x) # the Hamiltonian
+        dH = torch.autograd.grad(H.sum(), x, create_graph=True)[0]
+        H_vector_field = torch.matmul(dH, self.M.t())
+        return H_vector_field
 
 
     def permutation_tensor(self, n):

@@ -9,10 +9,10 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PARENT_DIR)
 
-from nn_models import MLP, PSD
+from nn_models import MLP, PSD, DampMatrix
 from hnn import HNN, HNN_structure
 from data import get_dataset, arrange_data
-from utils import L2_loss, to_pickle
+from utils import L2_loss, to_pickle, abs_loss
 
 import time
 
@@ -65,8 +65,10 @@ def train(args):
 
         output_dim = args.input_dim if args.baseline else 1
         nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        damp_model = PSD(input_dim=args.input_dim, hidden_dim=30, 
-                    diag_dim=args.input_dim, nonlinearity=args.nonlinearity).to(device)
+        # damp_model = PSD(input_dim=args.input_dim, hidden_dim=30, 
+        #             diag_dim=args.input_dim, nonlinearity=args.nonlinearity).to(device)
+        damp_model = DampMatrix(input_dim=args.input_dim, hidden_dim=10,
+                    diag_dim=args.input_dim, device=device, nonlinearity=args.nonlinearity).to(device)
         model = HNN(args.input_dim, differentiale_model=nn_model, device=device, 
                 baseline=args.baseline, damp=args.damp, dampNet=damp_model).to(device)
     elif args.structure and args.baseline == False:
@@ -100,7 +102,7 @@ def train(args):
         
         # run test data
         test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='dopri5')
-        test_loss = L2_loss(test_x, test_x_hat)
+        test_loss = abs_loss(test_x, test_x_hat)
 
         # logging
         stats['train_loss'].append(loss.item())
