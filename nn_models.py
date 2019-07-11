@@ -32,7 +32,7 @@ class PSD(torch.nn.Module):
         assert diag_dim > 1
         self.diag_dim = diag_dim
         self.off_diag_dim = int(diag_dim * (diag_dim - 1) / 2)
-        self.linear1 = torch.nn.Linear(int(input_dim/2), hidden_dim)
+        self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
         self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
         self.linear3 = torch.nn.Linear(hidden_dim, self.off_diag_dim)
         self.linear4 = torch.nn.Linear(hidden_dim, diag_dim)
@@ -42,9 +42,8 @@ class PSD(torch.nn.Module):
         
         self.nonlinearity = choose_nonlinearity(nonlinearity)
 
-    def forward(self, x):
-        bs = x.shape[0]
-        q, p = torch.split(x, 1, dim=1)
+    def forward(self, q):
+        bs = q.shape[0]
         h = self.nonlinearity( self.linear1(q) )
         h = self.nonlinearity( self.linear2(h) )
         diag = self.linear4(h)
@@ -88,3 +87,27 @@ class DampMatrix(torch.nn.Module):
         D = torch.zeros(bs, 2, 2, device=self.device)
         D[:, 1, 1] = d*d * torch.ones(bs).to(self.device)
         return D
+
+class ConstraintNet(torch.nn.Module):
+    '''A Neural Net which outputs a structured constraint matrix specified by the interconnection'''
+    def __init__(self, input_dim, hidden_dim, num_links, num_constraints, nonlinearity='tanh'):
+        super(ConstraintNet, self).__init__()
+        self.num_links = num_links
+        self.num_constraints = num_constraints
+
+        self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
+        self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
+        self.linear3 = torch.nn.Linear(hidden_dim, num_constraints*num_links*3)
+
+        for l in [self.linear1, self.linear2, self.linear3]:
+            torch.nn.init.orthogonal_(l.weight) # use a principled initialization
+        
+        self.nonlinearity = choose_nonlinearity(nonlinearity)
+
+    def forward(self, x):
+        bs = x.shape[0]
+        h = self.nonlinearity( self.linear1(x) )
+        h = self.nonlinearity( self.linear2(h) )
+        y = self.nonlinearity( self.linear3(h) )
+
+        return torch.reshape(y, (bs, 3*self.num_links, self.num_constraints))

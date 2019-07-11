@@ -7,6 +7,7 @@ import autograd.numpy as np
 import scipy.integrate
 solve_ivp = scipy.integrate.solve_ivp
 from utils import to_pickle, from_pickle
+import gym
 
 
 def get_theta(cos, sin):
@@ -16,7 +17,7 @@ def get_theta(cos, sin):
     return theta
 
 def get_q_p(obs):
-    '''construct p and q from gym observations'''
+    '''construct q and p from gym observations of Acrobot-v1'''
     x1 = 0.5 * 1 * obs[1]
     y1 = 0.5 * 1 * obs[0]
     theta_1 = get_theta(obs[0], obs[1])
@@ -30,7 +31,7 @@ def get_q_p(obs):
     return np.array([x1, y1, theta_1, x2, y2, theta_1+theta_2, x1_dot, y1_dot, obs[4]/12, x2_dot, y2_dot, (obs[4] + obs[5])/12])
 
 def sample_gym(seed=0, timesteps=103, trials=200, side=28, min_angle=0., max_angle=np.pi/6, 
-              verbose=False, env_name='Acrobat-v1'):
+              verbose=False, env_name='Acrobot-v1'):
     
     gym_settings = locals()
     if verbose:
@@ -48,10 +49,10 @@ def sample_gym(seed=0, timesteps=103, trials=200, side=28, min_angle=0., max_ang
 
                 while not angle_ok:
                     obs = env.reset()
-                    theta_init = np.abs(get_theta(obs))
+                    theta_init = np.abs(get_theta(obs[0], obs[1]))
                     if verbose:
                         print("\tCalled reset. Max angle= {:.3f}".format(theta_init))
-                    if theta_init > min_angle and theta_init < max)angle:
+                    if theta_init > min_angle and theta_init < max_angle:
                         angle_ok = True
                 if verbose:
                     print("\tRunning environment...")
@@ -60,7 +61,7 @@ def sample_gym(seed=0, timesteps=103, trials=200, side=28, min_angle=0., max_ang
             x = get_q_p(obs)
             traj.append(x)
         traj = np.stack(traj)
-        trajs.append = traj
+        trajs.append(traj)
     trajs = np.stack(trajs) # (trials, timesteps, 6)
     trajs = np.transpose(trajs, (1, 0, 2)) # (timesteps, trails, 6)
     return trajs, gym_settings
