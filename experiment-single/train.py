@@ -54,12 +54,12 @@ def train(args):
             else "Training structured HNN ODE model with num of points = {}:".format(args.num_points))
 
     
-    M_net = PSD(int(args.input_dim/2), 50, int(args.input_dim/2)).to(device)
-    V_net = MLP(int(args.input_dim/2), 50, 1).to(device)
-    A_net = ConstraintNet(int(args.input_dim/2), 50, 1, 2).to(device)
-    model = HNN_structure_pend(args.input_dim, M_net, V_net, A_net, device).to(device)
+    M_net = PSD(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
+    V_net = MLP(int(args.input_dim/2), args.hidden_dim, 1).to(device)
+    F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2)).to(device)
+    model = HNN_structure_pend(args.input_dim, M_net, V_net, F_net, device).to(device)
     
-    optim = torch.optim.Adam(model.parameters(), 1e10-3, weight_decay=1e-4)
+    optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
     # arrange data
     data = get_dataset(seed=args.seed, gym=args.gym, save_dir=args.save_dir, verbose=args.verbose)
@@ -100,13 +100,13 @@ def train(args):
             # path = '{}/{}{}-stats.pkl'.format(args.save_dir, args.name, label)
             # to_pickle(stats, path)
 
-    train_x_hat = odeint(model.time_derivative, train_x[0, :, :], t_eval, method='dopri5')
-    train_dist = (train_x - train_x_hat)**2
-    test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='dopri5')
-    test_dist = (test_x - test_x_hat)**2
-    print('Final train loss {:.4e} +/- {:.4e}\nFinal test loss {:.4e} +/- {:.4e}'
-        .format(train_dist.mean().item(), train_dist.std().item()/np.sqrt(train_dist.shape[0]*train_dist.shape[1]),
-            test_dist.mean().item(), test_dist.std().item()/np.sqrt(test_dist.shape[0]*test_dist.shape[1])))
+    # train_x_hat = odeint(model.time_derivative, train_x[0, :, :], t_eval, method='dopri5')
+    # train_dist = (train_x - train_x_hat)**2
+    # test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='dopri5')
+    # test_dist = (test_x - test_x_hat)**2
+    # print('Final train loss {:.4e} +/- {:.4e}\nFinal test loss {:.4e} +/- {:.4e}'
+    #     .format(train_dist.mean().item(), train_dist.std().item()/np.sqrt(train_dist.shape[0]*train_dist.shape[1]),
+    #         test_dist.mean().item(), test_dist.std().item()/np.sqrt(test_dist.shape[0]*test_dist.shape[1])))
 
     return model, stats
 

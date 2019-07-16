@@ -95,5 +95,11 @@ when distributed away from the origin, the damped HNN learn noise as a damping t
 The above analysis is based on a state-independent damping matrix with three zero elements.
 ---
 
+# Interconnected systems
+The motivating example of an interconnected system is a double pendulum. If we can apply ODENet and HNN in a modular way, we can apply the methodology to more complicated systems. 
 
+I started with the 6D q and p as training data for a single pendulum, trying to work through the whole procedure.
 
+The constraint force is the most challenging part. Implementing the implicit form in Vincent's PhD thesis didn't work well. The method is not satisfactory in the beginning.
+
+The key 

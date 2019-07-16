@@ -15,6 +15,11 @@ def hamiltonian_fn(coords):
     H = 5*(1-np.cos(q)) + 1.5 * p**2 
     return H
 
+def hamiltonian_6d_fn(coords):
+    x, y, theta, p_x, p_y, p_theta = np.split(coords, 6, axis=1)
+    H = p_x * p_x /2 + p_y * p_y /2 + 6 * p_theta * p_theta + 10 * y + 5
+    return H
+
 def dynamics_fn(t, coords):
     dcoords = autograd.grad(hamiltonian_fn)(coords)
     dqdt, dpdt = np.split(dcoords,2)
@@ -24,13 +29,15 @@ def dynamics_fn(t, coords):
 def get_trajectory(t_span=[0,3], timescale=20, radius=None, y0=None, noise_std=0.1, **kwargs):
     t_eval = np.linspace(t_span[0], t_span[1], int(timescale*(t_span[1]-t_span[0])))
     
-    # get initial state
-    if y0 is None:
-        y0 = np.random.rand(2)*2.-1
-    if radius is None:
-        radius = np.random.rand() + 1.3 # sample a range of radii
-    y0 = y0 / np.sqrt((y0**2).sum()) * radius ## set the appropriate radius
+    # # get initial state
+    # if y0 is None:
+    #     y0 = np.random.rand(2)*2.-1
+    # if radius is None:
+    #     radius = np.random.rand() + 1.3 # sample a range of radii
+    # y0 = y0 / np.sqrt((y0**2).sum()) * radius ## set the appropriate radius
 
+    y0 = (np.random.rand(2) - 0.5) * 5
+    
     spring_ivp = solve_ivp(fun=dynamics_fn, t_span=t_span, y0=y0, t_eval=t_eval, rtol=1e-10, **kwargs)
     q, p = spring_ivp['y'][0], spring_ivp['y'][1]
     dydt = [dynamics_fn(None, y) for y in spring_ivp['y'].T]
@@ -130,7 +137,7 @@ def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, **
         np.random.seed(seed)
         xs = []
         for _ in range(samples):
-            q, p, _, _, t = get_trajectory(**kwargs)
+            q, p, _, _, t = get_trajectory(noise_std=0.0, **kwargs)
             q_p_6D = transform_q_p(q, p)
             xs.append(q_p_6D)
             
