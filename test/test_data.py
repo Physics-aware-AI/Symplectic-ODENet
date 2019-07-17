@@ -27,6 +27,6 @@ x, y, theta, p_x, p_y, p_theta = traj[:, 0], traj[:, 1], traj[:, 2], traj[:, 3],
 H = p_x * p_x /2 + p_y * p_y /2 + 6 * p_theta * p_theta + 10 * y + 5
 print(H)
 #%%
-plt.plot(y)
+plt.plot(p_y)
 
 #%%

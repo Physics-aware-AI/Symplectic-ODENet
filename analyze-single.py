@@ -72,7 +72,7 @@ def get_model(args, baseline, structure, damping, num_points):
     M_net = PSD(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
     V_net = MLP(int(args.input_dim/2), args.hidden_dim, 1).to(device)
     # A_net = ConstraintNet(int(args.input_dim/2), 50, 1, 2).to(device)
-    F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2)).to(device)
+    F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2), bias_bool=False).to(device)
     model = HNN_structure_pend(args.input_dim, M_net, V_net, F_net, device).to(device)
     path = '{}pend-hnn_ode-p{}.tar'.format(args.save_dir, num_points)
     model.load_state_dict(torch.load(path, map_location=device))
@@ -87,7 +87,7 @@ def integrate_model(model, t_span, y0, **kwargs):
     
     def fun(t, np_x):
         x = torch.tensor( np_x, requires_grad=True, dtype=torch.float32).view(1,6).to(device)
-        dx = model.time_derivative(_, x).detach().cpu().numpy().reshape(-1)
+        dx = model.time_derivative(0, x).detach().cpu().numpy().reshape(-1)
         return dx
 
     return solve_ivp(fun=fun, t_span=t_span, y0=y0, **kwargs)
@@ -133,7 +133,7 @@ hnn_ode_model = get_model(args, baseline=False, structure=False, damping=False, 
 #%%
 def integrate_models(x0=np.asarray([1, 0]), t_span=[0,5], t_eval=None):
     # integrate along ground truth vector field
-    kwargs = {'t_eval': t_eval, 'rtol': 1e-7}
+    kwargs = {'t_eval': t_eval, 'rtol': 1e-7, 'method': 'LSODA'}
     true_path = solve_ivp(fun=dynamics_fn, t_span=t_span, y0=x0, **kwargs)
     q, p = true_path['y'][0,:], true_path['y'][1,:]
     true_x = transform_q_p(q, p)
@@ -149,9 +149,23 @@ def integrate_models(x0=np.asarray([1, 0]), t_span=[0,5], t_eval=None):
 
 #%%
 x0 = np.asarray([2.1, 0])
+t_span=[0,10]
+t_eval = np.linspace(t_span[0], t_span[1], 100)
+kwargs = {'t_eval': t_eval, 'rtol': 1e-7, 'method': 'RK23'}
+
+# integrate along HNN vector field
+y0 = transform_q_p(np.array([x0[0]]), np.array([x0[1]]))
+y0 = y0[0]
+
+#%%
+hnn_path = integrate_model(hnn_ode_model, t_span, y0, **kwargs)
+hnn_x = hnn_path['y'].T
+hnn_x
+#%%
+x0 = np.asarray([2.1, 0])
 
 # integration
-t_span=[0,10]
+t_span=[0,1]
 t_eval = np.linspace(t_span[0], t_span[1], 100)
 true_x, hnn_x = integrate_models(x0=x0, t_span=t_span, t_eval=t_eval)
 
@@ -225,5 +239,52 @@ plt.plot(RHS[:,4])
 #%%
 plt.plot(RHS[:,5])
 
+#%%
+pend_hnn_stats = from_pickle(EXPERIMENT_DIR + 'pend-hnn_ode-p4-stats.pkl')
+hnn_nfe = np.array(pend_hnn_stats['nfe'])
+hnn_diff_nfe = hnn_nfe[1:] - hnn_nfe[:-1]
+hnn_forward_time = np.array(pend_hnn_stats['forward_time'])
+hnn_backward_time = np.array(pend_hnn_stats['backward_time'])
+hnn_train_loss = np.array(pend_hnn_stats['train_loss'])
+hnn_test_loss = np.array(pend_hnn_stats['test_loss'])
+#%%
+plt.plot(hnn_train_loss)
+
+#%%
+plt.plot(hnn_test_loss)
+
+#%%
+dHdq, dHdp, F, Fc, dHdp_Fc = hnn_ode_model.get_intermediate_value(_, tensor_x)
+
+
+#%%
+dHdq = dHdq.detach().cpu().numpy()
+dHdp = dHdp.detach().cpu().numpy()
+F = F.detach().cpu().numpy()
+Fc = Fc.detach().cpu().numpy()
+dHdp_Fc = dHdp_Fc.detach().cpu().numpy()
+
+
+#%%
+plt.plot(dHdp_Fc)
+
+#%%
+plt.plot(dHdp[:, 0])
+
+#%%
+
+plt.plot(dHdp[:, 1])
+
+#%%
+plt.plot(dHdp[:, 2])
+
+#%%
+plt.plot(Fc[:, 0])
+
+#%%
+plt.plot(Fc[:, 1])
+
+#%%
+plt.plot(Fc[:, 2])
 
 #%%

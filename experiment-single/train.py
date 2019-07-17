@@ -52,13 +52,22 @@ def train(args):
     if args.verbose:
         print("Training baseline ODE model with num of points = {}:".format(args.num_points) if args.baseline 
             else "Training structured HNN ODE model with num of points = {}:".format(args.num_points))
+    
+    if args.structure == False:
+        output_dim = args.input_dim if args.baseline else 1
+        nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
+        F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2), bias_bool=False).to(device)
+        model = HNN_structure_pend(args.input_dim, H_net=nn_model, F_net=F_net, device=device, baseline=args.baseline)
+    elif args.structure == True and args.baseline ==False:
+    
+        M_net = PSD(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
+        V_net = MLP(int(args.input_dim/2), 4, 1).to(device)
+        F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2), bias_bool=False).to(device)
+        model = HNN_structure_pend(args.input_dim, M_net=M_net, V_net=V_net, F_net=F_net, device=device, baseline=args.baseline, structure=True).to(device)
+    else:
+        raise RuntimeError('argument *baseline* and *structure* cannot both be true')
 
-    
-    M_net = PSD(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
-    V_net = MLP(int(args.input_dim/2), args.hidden_dim, 1).to(device)
-    F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2)).to(device)
-    model = HNN_structure_pend(args.input_dim, M_net, V_net, F_net, device).to(device)
-    
+
     optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
     # arrange data

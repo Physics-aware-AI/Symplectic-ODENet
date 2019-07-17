@@ -125,46 +125,62 @@ class HNN_structure(torch.nn.Module):
         return M.to(self.device)
 
 class HNN_structure_pend(torch.nn.Module):
-    def __init__(self, input_dim, M_net, V_net, F_net, device,
-                    assume_canonical_coords=True):
+    def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, F_net=None, device=None,
+                    assume_canonical_coords=True, baseline=False, structure=False):
         super(HNN_structure_pend, self).__init__()
-        self.M_net = M_net
-        self.V_net = V_net
-        self.F_net = F_net
+        self.baseline = baseline
+        self.structure = structure
+        if self.structure:
+            self.M_net = M_net
+            self.V_net = V_net
+            self.F_net = F_net
+        else:
+            self.H_net = H_net
+            self.F_net = F_net
+
         self.device = device
         self.assume_canonical_coords = assume_canonical_coords
         self.M = self.permutation_tensor(input_dim)
         self.nfe = 0
 
     def forward(self, x):
-        bs = x.shape[0]
+        if self.baseline:
+            return self.H_net(x)
+        if self.structure:
+            bs = x.shape[0]
 
-        q, p = torch.chunk(x, 2, dim=1)
-        V_q = self.V_net(q)
-        # M_q_inv = self.M_net(q)
-        M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
-        M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
-        M_q_inv = M_q_inv.repeat(bs,1,1)
+            q, p = torch.chunk(x, 2, dim=1)
+            V_q = self.V_net(q)
+            # M_q_inv = self.M_net(q)
+            M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
+            M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
+            M_q_inv = M_q_inv.repeat(bs,1,1)
 
-        p_aug = torch.unsqueeze(p, dim=2)
-        H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+            p_aug = torch.unsqueeze(p, dim=2)
+            H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+        else:
+            H = self.H_net(x)
 
         return H
 
     def time_derivative(self, t, x):
         self.nfe += 1
-        bs = x.shape[0]
+        if self.baseline:
+            return self.H_net(x)
+        if self.structure:
+            bs = x.shape[0]
 
-        q, p = torch.chunk(x, 2, dim=1)
-        V_q = self.V_net(q)
-        # M_q_inv = self.M_net(q)
-        M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
-        M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
-        M_q_inv = M_q_inv.repeat(bs,1,1)
+            q, p = torch.chunk(x, 2, dim=1)
+            V_q = self.V_net(q)
+            # M_q_inv = self.M_net(q)
+            M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
+            M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
+            M_q_inv = M_q_inv.repeat(bs,1,1)
 
-        p_aug = torch.unsqueeze(p, dim=2)
-        H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
-
+            p_aug = torch.unsqueeze(p, dim=2)
+            H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+        else:
+            H = self.H_net(x)
         dH = torch.autograd.grad(H.sum(), x, create_graph=True)[0]
         H_vector_field = torch.matmul(dH, self.M.t())
         dHdq, dHdp = torch.chunk(dH, 2, dim=1)
@@ -172,12 +188,15 @@ class HNN_structure_pend(torch.nn.Module):
         # dHdq1 = torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
         # dHdp1 = torch.squeeze(torch.matmul(M_q_inv, p_aug), dim=2)
 
-        F = self.F_net(torch.cat((q, p, dHdq), dim=1))
-        beta = torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(F, 2)) \
-                / torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(dHdp, 2))
-        beta = torch.squeeze(beta, dim=2)
-        Fc = F - beta * dHdp
-                
+        F = self.F_net(torch.cat((x, dHdq), dim=1))
+        num = torch.squeeze(torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(F, 2)), dim=2)
+        num = num * dHdp
+        den = torch.squeeze(torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(dHdp, 2)), dim=2)
+        div = num/den
+        div = torch.where(torch.isnan(div), torch.zeros_like(div), div)
+
+        Fc = F - div
+
         Fc_vector_field = torch.cat((torch.zeros_like(Fc), Fc), dim=1)
 
         return H_vector_field + Fc_vector_field
@@ -224,3 +243,34 @@ class HNN_structure_pend(torch.nn.Module):
                 for j in range(i+1, n):
                     M[i,j] *= -1
         return M.to(self.device)
+
+    def get_intermediate_value(self, t, x):
+        bs = x.shape[0]
+
+        q, p = torch.chunk(x, 2, dim=1)
+        V_q = self.V_net(q)
+        # M_q_inv = self.M_net(q)
+        M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
+        M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
+        M_q_inv = M_q_inv.repeat(bs,1,1)
+
+        p_aug = torch.unsqueeze(p, dim=2)
+        H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+
+        dH = torch.autograd.grad(H.sum(), x, create_graph=True)[0]
+        H_vector_field = torch.matmul(dH, self.M.t())
+        dHdq, dHdp = torch.chunk(dH, 2, dim=1)
+
+        # dHdq1 = torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
+        # dHdp1 = torch.squeeze(torch.matmul(M_q_inv, p_aug), dim=2)
+
+        F = self.F_net(torch.cat((q, p, dHdq), dim=1))
+        num = torch.squeeze(torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(F, 2)), dim=2)
+        num = num * dHdp
+        den = torch.squeeze(torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(dHdp, 2)), dim=2)
+        Fc = F - num/den
+
+        Fc_vector_field = torch.cat((torch.zeros_like(Fc), Fc), dim=1)
+
+        dHdp_Fc = torch.squeeze(torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(Fc, 2)), dim=2)
+        return dHdq, dHdp, F, Fc, dHdp_Fc
