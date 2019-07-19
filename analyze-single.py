@@ -25,7 +25,7 @@ LINE_WIDTH = 2
 
 def get_args():
     return {'input_dim': 6,
-         'hidden_dim': 200,
+         'hidden_dim': 600,
          'learn_rate': 1e-3,
          'nonlinearity': 'tanh',
          'total_steps': 2000,
@@ -37,7 +37,7 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 4,
+         'num_points': 2,
          'gpu': 0}
 
 class ObjectView(object):
@@ -69,13 +69,20 @@ plt.tight_layout() ; plt.show()
 #%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 def get_model(args, baseline, structure, damping, num_points):
-    M_net = PSD(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
-    V_net = MLP(int(args.input_dim/2), args.hidden_dim, 1).to(device)
-    # A_net = ConstraintNet(int(args.input_dim/2), 50, 1, 2).to(device)
-    F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2), bias_bool=False).to(device)
-    model = HNN_structure_pend(args.input_dim, M_net, V_net, F_net, device).to(device)
-    path = '{}pend-hnn_ode-p{}.tar'.format(args.save_dir, num_points)
-    model.load_state_dict(torch.load(path, map_location=device))
+    if structure == False:
+        output_dim = args.input_dim if baseline else 1
+        nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
+        F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2), bias_bool=False).to(device)
+        model = HNN_structure_pend(args.input_dim, H_net=nn_model, F_net=F_net, device=device, baseline=baseline)
+    elif structure == True and baseline ==False:
+    
+        M_net = PSD(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
+        V_net = MLP(int(args.input_dim/2), 4, 1).to(device)
+        F_net = MLP(int(args.input_dim/2)*3, args.hidden_dim, int(args.input_dim/2), bias_bool=False).to(device)
+        model = HNN_structure_pend(args.input_dim, M_net=M_net, V_net=V_net, F_net=F_net, device=device, baseline=baseline, structure=True).to(device)
+    else:
+        raise RuntimeError('argument *baseline* and *structure* cannot both be true')
+
     return model
 
 #%% [markdown]
@@ -94,7 +101,7 @@ def integrate_model(model, t_span, y0, **kwargs):
 
 #%% [markdown]
 # ## Run analysis
-
+baseline_ode_model = get_model(args, baseline=True, structure=False, damping=False, num_points=args.num_points)
 hnn_ode_model = get_model(args, baseline=False, structure=False, damping=False, num_points=args.num_points)
 
 #%%
@@ -133,7 +140,7 @@ hnn_ode_model = get_model(args, baseline=False, structure=False, damping=False, 
 #%%
 def integrate_models(x0=np.asarray([1, 0]), t_span=[0,5], t_eval=None):
     # integrate along ground truth vector field
-    kwargs = {'t_eval': t_eval, 'rtol': 1e-7, 'method': 'LSODA'}
+    kwargs = {'t_eval': t_eval, 'rtol': 1e-7, 'method': 'RK45'}
     true_path = solve_ivp(fun=dynamics_fn, t_span=t_span, y0=x0, **kwargs)
     q, p = true_path['y'][0,:], true_path['y'][1,:]
     true_x = transform_q_p(q, p)
@@ -145,29 +152,33 @@ def integrate_models(x0=np.asarray([1, 0]), t_span=[0,5], t_eval=None):
     hnn_x = hnn_path['y'].T
     # hnn_x = true_x
 
-    return true_x, hnn_x
+    # integrate along baseline vector field
+    baseline_path = integrate_model(baseline_ode_model, t_span, y0, **kwargs)
+    baseline_x = baseline_path['y'].T
 
-#%%
-x0 = np.asarray([2.1, 0])
-t_span=[0,10]
-t_eval = np.linspace(t_span[0], t_span[1], 100)
-kwargs = {'t_eval': t_eval, 'rtol': 1e-7, 'method': 'RK23'}
+    return true_x, hnn_x, baseline_x
 
-# integrate along HNN vector field
-y0 = transform_q_p(np.array([x0[0]]), np.array([x0[1]]))
-y0 = y0[0]
+# #%%
+# x0 = np.asarray([2.1, 0])
+# t_span=[0,10]
+# t_eval = np.linspace(t_span[0], t_span[1], 100)
+# kwargs = {'t_eval': t_eval, 'rtol': 1e-5, 'method': 'RK45'}
 
-#%%
-hnn_path = integrate_model(hnn_ode_model, t_span, y0, **kwargs)
-hnn_x = hnn_path['y'].T
-hnn_x
+# # integrate along HNN vector field
+# y0 = transform_q_p(np.array([x0[0]]), np.array([x0[1]]))
+# y0 = y0[0]
+
+# #%%
+# hnn_path = integrate_model(hnn_ode_model, t_span, y0, **kwargs)
+# hnn_x = hnn_path['y'].T
+# hnn_x
 #%%
 x0 = np.asarray([2.1, 0])
 
 # integration
-t_span=[0,1]
-t_eval = np.linspace(t_span[0], t_span[1], 100)
-true_x, hnn_x = integrate_models(x0=x0, t_span=t_span, t_eval=t_eval)
+t_span=[0,10]
+t_eval = np.linspace(t_span[0], t_span[1], 1000)
+true_x, hnn_x, baseline_x = integrate_models(x0=x0, t_span=t_span, t_eval=t_eval)
 
 #%%
 tpad = 7
@@ -191,11 +202,11 @@ plt.plot(t_eval, true_x[:, 3], t_eval, hnn_x[:, 3], 'g-')
 
 plt.subplot(7,1,5)
 plt.title("p_y and p_yhat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$p_x and p_xhat$')
-plt.plot(t_eval, true_x[:, 3], t_eval, hnn_x[:, 3], 'g-')
+plt.plot(t_eval, true_x[:, 4], t_eval, hnn_x[:, 4], 'g-')
 
 plt.subplot(7,1,6)
 plt.title("p_theta and p_thetahat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$p_x and p_xhat$')
-plt.plot(t_eval, true_x[:, 3], t_eval, hnn_x[:, 3], 'g-')
+plt.plot(t_eval, true_x[:, 5], t_eval, hnn_x[:, 5], 'g-')
 
 plt.subplot(7,1,7)
 plt.title("Total energy", pad=tpad)
@@ -204,10 +215,44 @@ true_e = hamiltonian_6d_fn(true_x)
 hnn_e = hamiltonian_6d_fn(hnn_x)
 plt.plot(t_eval, true_e, t_eval, hnn_e, 'g-')
 
+#%%
+tpad = 7
 
+fig = plt.figure(figsize=[12,28], dpi=DPI)
+plt.subplot(7,1,1)
+plt.title("x and x_hat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$x and x_hat$')
+plt.plot(t_eval, true_x[:, 0], t_eval, baseline_x[:, 0], 'g-')
+
+plt.subplot(7,1,2)
+plt.title("y and y_hat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$p_x and p_xhat$')
+plt.plot(t_eval, true_x[:, 1], t_eval, baseline_x[:, 1], 'g-')
+
+plt.subplot(7,1,3)
+plt.title("theta and theta_hat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$p_x and p_xhat$')
+plt.plot(t_eval, true_x[:, 2], t_eval, baseline_x[:, 2], 'g-')
+
+plt.subplot(7,1,4)
+plt.title("p_x and p_xhat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$p_x and p_xhat$')
+plt.plot(t_eval, true_x[:, 3], t_eval, baseline_x[:, 3], 'g-')
+
+plt.subplot(7,1,5)
+plt.title("p_y and p_yhat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$p_x and p_xhat$')
+plt.plot(t_eval, true_x[:, 4], t_eval, baseline_x[:, 4], 'g-')
+
+plt.subplot(7,1,6)
+plt.title("p_theta and p_thetahat", pad=tpad) ; plt.xlabel('$t$') #; plt.ylabel('$p_x and p_xhat$')
+plt.plot(t_eval, true_x[:, 5], t_eval, baseline_x[:, 5], 'g-')
+
+plt.subplot(7,1,7)
+plt.title("Total energy", pad=tpad)
+plt.xlabel('Time step')
+true_e = hamiltonian_6d_fn(true_x)
+baseline_e = hamiltonian_6d_fn(baseline_x)
+plt.plot(t_eval, true_e, t_eval, baseline_e, 'g-')
 #%%
 # fig.savefig('{}/pend-single-wo-force-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
 
+true_x_dot = (true_x[1:,:] - true_x[:-1,:])/(t_eval[1] - t_eval[0])
 
 #%%
 tensor_x = torch.tensor(true_x, dtype=torch.float32, requires_grad=True).to(device)
@@ -222,23 +267,33 @@ plt.plot(H_hat.detach().cpu().numpy())
 RHS = hnn_ode_model.time_derivative(_, tensor_x)
 RHS = RHS.detach().cpu().numpy()
 #%%
-plt.plot(RHS[:,0])
+plt.plot(RHS[:-1,0])
+plt.plot(true_x_dot[:,0])
 
 #%%
 plt.plot(RHS[:,1])
+plt.plot(true_x_dot[:,1])
 
 #%%
 plt.plot(RHS[:,2])
+plt.plot(true_x_dot[:,2])
 
 #%%
 plt.plot(RHS[:,3])
+plt.plot(true_x_dot[:,3])
 
 #%%
 plt.plot(RHS[:,4])
+plt.plot(true_x_dot[:,4])
 
 #%%
 plt.plot(RHS[:,5])
+plt.plot(true_x_dot[:,5])
 
+#%%
+v_q = hnn_ode_model.V_net(tensor_x[:,0:3])
+v_q = v_q.detach().cpu().numpy()
+plt.plot(v_q)
 #%%
 pend_hnn_stats = from_pickle(EXPERIMENT_DIR + 'pend-hnn_ode-p4-stats.pkl')
 hnn_nfe = np.array(pend_hnn_stats['nfe'])

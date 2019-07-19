@@ -19,7 +19,7 @@ import time
 def get_args():
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('--input_dim', default=6, type=int, help='dimensionality of input tensor')
-    parser.add_argument('--hidden_dim', default=200, type=int, help='hidden dimension of mlp')
+    parser.add_argument('--hidden_dim', default=600, type=int, help='hidden dimension of mlp')
     parser.add_argument('--learn_rate', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--nonlinearity', default='tanh', type=str, help='neural net nonlinearity')
     parser.add_argument('--total_steps', default=2000, type=int, help='number of gradient steps')
@@ -72,29 +72,34 @@ def train(args):
 
     # arrange data
     data = get_dataset(seed=args.seed, gym=args.gym, save_dir=args.save_dir, verbose=args.verbose)
-    train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
-    test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
+    train_x, train_x_dot, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points, output_diff=True)
+    test_x, test_x_dot, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points, output_diff=True)
 
     train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
     test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
     t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
+    train_x_dot = torch.tensor(train_x_dot, requires_grad=True, dtype=torch.float32).to(device)
+    test_x_dot = torch.tensor(test_x_dot, requires_grad=True, dtype=torch.float32).to(device)
+    train_x_input = torch.cat((train_x, train_x_dot[:, :, 3:]), dim=2)
+    test_x_input = torch.cat((test_x, test_x_dot[:, :, 3:]), dim=2)
+
 
     # training loop
     stats = {'train_loss': [], 'test_loss': [], 'forward_time': [], 'backward_time': [],'nfe': []}
     for step in range(args.total_steps+1):
         # train step
         t = time.time()
-        train_x_hat = odeint(model.time_derivative, train_x[0, :, :], t_eval, method='rk4')
+        train_x_hat = odeint(model.time_derivative, train_x_input[0, :, :], t_eval, method='rk4')
         forward_time = time.time() - t
-        loss = L2_loss(train_x, train_x_hat)
+        loss = L2_loss(train_x_input[:, :, 0:6], train_x_hat[:, :, 0:6])
 
         t = time.time()
         loss.backward() ; optim.step() ; optim.zero_grad()
         backward_time = time.time() - t
         
         # run test data
-        test_x_hat = odeint(model.time_derivative, test_x[0, :, :], t_eval, method='rk4')
-        test_loss = L2_loss(test_x, test_x_hat)
+        test_x_hat = odeint(model.time_derivative, test_x_input[0, :, :], t_eval, method='rk4')
+        test_loss = L2_loss(test_x_input[:, :, 0:6], test_x_hat[:, :, 0:6])
 
         # logging
         stats['train_loss'].append(loss.item())

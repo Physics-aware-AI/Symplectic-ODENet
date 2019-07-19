@@ -149,7 +149,7 @@ class HNN_structure_pend(torch.nn.Module):
         if self.structure:
             bs = x.shape[0]
 
-            q, p = torch.chunk(x, 2, dim=1)
+            q, p, p_dot = torch.chunk(x, 3, dim=1)
             V_q = self.V_net(q)
             # M_q_inv = self.M_net(q)
             M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
@@ -170,7 +170,7 @@ class HNN_structure_pend(torch.nn.Module):
         if self.structure:
             bs = x.shape[0]
 
-            q, p = torch.chunk(x, 2, dim=1)
+            q, p, p_dot = torch.chunk(x, 3, dim=1)
             V_q = self.V_net(q)
             # M_q_inv = self.M_net(q)
             M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
@@ -182,13 +182,13 @@ class HNN_structure_pend(torch.nn.Module):
         else:
             H = self.H_net(x)
         dH = torch.autograd.grad(H.sum(), x, create_graph=True)[0]
-        H_vector_field = torch.matmul(dH, self.M.t())
-        dHdq, dHdp = torch.chunk(dH, 2, dim=1)
+        H_vector_field = torch.matmul(dH[:, 0:6], self.M.t())
+        dHdq, dHdp, _ = torch.chunk(dH, 3, dim=1)
 
         # dHdq1 = torch.autograd.grad(V_q.sum(), q, create_graph=True)[0]
         # dHdp1 = torch.squeeze(torch.matmul(M_q_inv, p_aug), dim=2)
 
-        F = self.F_net(torch.cat((x, dHdq), dim=1))
+        F = self.F_net(x)
         num = torch.squeeze(torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(F, 2)), dim=2)
         num = num * dHdp
         den = torch.squeeze(torch.bmm(torch.unsqueeze(dHdp, 1), torch.unsqueeze(dHdp, 2)), dim=2)
@@ -199,7 +199,7 @@ class HNN_structure_pend(torch.nn.Module):
 
         Fc_vector_field = torch.cat((torch.zeros_like(Fc), Fc), dim=1)
 
-        return H_vector_field + Fc_vector_field
+        return torch.cat((H_vector_field + Fc_vector_field, torch.zeros_like(Fc)), dim=1)
 
         # A_q = self.A_net(q)
         # A_T_q = torch.transpose(A_q, 1, 2)
