@@ -103,7 +103,7 @@ def integrate_model(model, t_span, y0, **kwargs):
 # ## Run analysis
 baseline_ode_model = get_model(args, baseline=True, structure=False, damping=False, num_points=args.num_points)
 hnn_ode_model = get_model(args, baseline=False, structure=False, damping=False, num_points=args.num_points)
-
+hnn_ode_struct_model = get_model(args, baseline=False, structure=True, damping=False, num_points=args.num_points)
 #%%
 # t_span = [0,28]
 # y0 = transform_q_p(np.array([2.1]), np.array([0.]))
@@ -158,27 +158,27 @@ def integrate_models(x0=np.asarray([1, 0]), t_span=[0,5], t_eval=None):
 
     return true_x, hnn_x, baseline_x
 
-# #%%
-# x0 = np.asarray([2.1, 0])
-# t_span=[0,10]
-# t_eval = np.linspace(t_span[0], t_span[1], 100)
-# kwargs = {'t_eval': t_eval, 'rtol': 1e-5, 'method': 'RK45'}
-
-# # integrate along HNN vector field
-# y0 = transform_q_p(np.array([x0[0]]), np.array([x0[1]]))
-# y0 = y0[0]
-
-# #%%
-# hnn_path = integrate_model(hnn_ode_model, t_span, y0, **kwargs)
-# hnn_x = hnn_path['y'].T
-# hnn_x
 #%%
 x0 = np.asarray([2.1, 0])
-
-# integration
 t_span=[0,10]
-t_eval = np.linspace(t_span[0], t_span[1], 1000)
-true_x, hnn_x, baseline_x = integrate_models(x0=x0, t_span=t_span, t_eval=t_eval)
+t_eval = np.linspace(t_span[0], t_span[1], 100)
+kwargs = {'t_eval': t_eval, 'rtol': 1e-5, 'method': 'RK45'}
+
+# integrate along HNN vector field
+y0 = transform_q_p(np.array([x0[0]]), np.array([x0[1]]))
+y0 = y0[0]
+
+#%%
+hnn_struct_path = integrate_model(hnn_ode_struct_model, t_span, y0, **kwargs)
+hnn_struct_x = hnn_path['y'].T
+hnn_struct_x
+#%%
+# x0 = np.asarray([2.1, 0])
+
+# # integration
+# t_span=[0,10]
+# t_eval = np.linspace(t_span[0], t_span[1], 1000)
+# true_x, hnn_x, baseline_x = integrate_models(x0=x0, t_span=t_span, t_eval=t_eval)
 
 #%%
 tpad = 7
