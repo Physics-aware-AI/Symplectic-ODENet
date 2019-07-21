@@ -65,7 +65,7 @@ def train(args):
         M_net = MLP(1, args.hidden_dim, 1).to(device)
         V_net = MLP(int(args.input_dim/3), 4, 1).to(device)
         g_net = MLP(int(args.input_dim/3), args.hidden_dim, int(args.input_dim/3)).to(device)
-        model = HNN_structure_forcing(args.input_dim, M_net=M_net, V_net=V_net, G_net=F_net, device=device, baseline=args.baseline, structure=True).to(device)
+        model = HNN_structure_forcing(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *baseline* and *structure* cannot both be true')
 
@@ -73,7 +73,7 @@ def train(args):
     optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
     # arrange data
-    data = get_dataset(seed=args.seed, gym=args.gym, save_dir=args.save_dir)
+    data = get_dataset(seed=args.seed, gym=args.gym, save_dir=args.save_dir, us=[-1.0, 0.0, 1.0])
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
@@ -82,7 +82,40 @@ def train(args):
     t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
 
     # training loop
-    
+    stats = {'train_loss': [], 'test_loss': [], 'forward_time': [], 'backward_time': [],'nfe': []}
+    for step in range(args.total_steps+1):
+        train_loss = 0
+        test_loss = 0
+        for i in range(train_x.shape[0]):
+            
+            t = time.time()
+            train_x_hat = odeint(model.time_derivative, train_x[i, 0, :, :], t_eval, method='dopri5')
+            forward_time = time.time() - t
+            train_loss_mini = L2_loss(train_x[i,:,:,:], train_x_hat)
+            train_loss = train_loss + train_loss_mini
+
+            t = time.time()
+            train_loss_mini.backward() ; optim.step() ; optim.zero_grad()
+            backward_time = time.time() - t
+
+            # run test data
+            test_x_hat = odeint(model.time_derivative, test_x[i, 0, :, :], t_eval, method='dopri5')
+            test_loss_mini = L2_loss(test_x[i,:,:,:], test_x_hat)
+            test_loss = test_loss + test_loss_mini
+
+        # logging
+        stats['train_loss'].append(train_loss.item())
+        stats['test_loss'].append(test_loss.item())
+        stats['forward_time'].append(forward_time)
+        stats['backward_time'].append(backward_time)
+        stats['nfe'].append(model.nfe)
+        if args.verbose and step % args.print_every == 0:
+            print("step {}, train_loss {:.4e}, test_loss {:.4e}".format(step, train_loss.item(), test_loss.item()))
+
+    return model, stats
+
+
+
 
 
 if __name__ == "__main__":

@@ -343,7 +343,7 @@ class HNN_structure_forcing(torch.nn.Module):
 
         F = g_q * u
 
-        Fc_vector_field = torch.cat((torch.zeros_like(F), F, torch.zeros_like(F)), dim=1)
+        F_vector_field = torch.cat((torch.zeros_like(F), F, torch.zeros_like(F)), dim=1)
 
         return H_vector_field + F_vector_field
 

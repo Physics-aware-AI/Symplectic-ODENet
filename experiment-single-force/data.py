@@ -31,6 +31,8 @@ def get_trajectory(t_span=[0,3], timescale=20, radius=None, y0=None, noise_std=0
     #     radius = np.random.rand() + 1.3 # sample a range of radii
     # y0 = y0 / np.sqrt((y0**2).sum()) * radius ## set the appropriate radius
     
+    y0 = (np.random.rand(2) - 0.5) * 5
+
     spring_ivp = solve_ivp(lambda t, y: dynamics_fn(t, y, u), t_span=t_span, y0=y0, t_eval=t_eval, rtol=1e-10, **kwargs)
     q, p = spring_ivp['y'][0], spring_ivp['y'][1]
     # dydt = [dynamics_fn(None, y) for y in spring_ivp['y'].T]
@@ -118,10 +120,11 @@ def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us
             to_pickle(data, path)
     else:
         # randomly sample inputs
-        np.random.seed(seed)
+        
         xs_force = []
         for u in us:
             xs = []
+            np.random.seed(seed)
             for _ in range(samples):
                 q, p, t = get_trajectory(noise_std=0.0, u=u, **kwargs)
                 xs.append(np.stack((q, p, np.ones_like(q)*u), axis=1)) # (45, 3) last dimension is u
