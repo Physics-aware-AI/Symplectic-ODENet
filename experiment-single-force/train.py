@@ -33,6 +33,7 @@ def get_args():
     parser.add_argument('--num_points', type=int, default=2, help='number of evaluation points by the ODE solver, including the initial point')
     parser.add_argument('--structure', dest='structure', action='store_true', help='using a structured Hamiltonian')
     parser.add_argument('--gym', dest='gym', action='store_true', help='use OpenAI gym to generate data')
+    parser.add_argument('--rad', dest='rad', action='store_true', help='generate random data around a radius')
     parser.set_defaults(feature=True)
     return parser.parse_args()
 
@@ -56,14 +57,14 @@ def train(args):
             print("using the structured Hamiltonian")
     
     if args.structure == False:
-        output_dim = args.input_dim if args.baseline else 1
-        nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
+        output_dim = args.input_dim-1 if args.baseline else 1
+        nn_model = MLP(args.input_dim-1, args.hidden_dim, output_dim, args.nonlinearity).to(device)
         g_net = MLP(int(args.input_dim/3), args.hidden_dim, int(args.input_dim/3)).to(device)
         model = HNN_structure_forcing(args.input_dim, H_net=nn_model, g_net=g_net, device=device, baseline=args.baseline)
     elif args.structure == True and args.baseline ==False:
     
         M_net = MLP(1, args.hidden_dim, 1).to(device)
-        V_net = MLP(int(args.input_dim/3), 4, 1).to(device)
+        V_net = MLP(int(args.input_dim/3), 50, 1).to(device)
         g_net = MLP(int(args.input_dim/3), args.hidden_dim, int(args.input_dim/3)).to(device)
         model = HNN_structure_forcing(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
     else:
@@ -73,7 +74,7 @@ def train(args):
     optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
     # arrange data
-    data = get_dataset(seed=args.seed, gym=args.gym, save_dir=args.save_dir, us=[-1.0, 0.0, 1.0])
+    data = get_dataset(seed=args.seed, gym=args.gym, save_dir=args.save_dir, rad=args.rad, us=[-2.0, -1.0, 0.0, 1.0, 2.0]) #us=np.linspace(-2.0, 2.0, 20)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
@@ -89,7 +90,7 @@ def train(args):
         for i in range(train_x.shape[0]):
             
             t = time.time()
-            train_x_hat = odeint(model.time_derivative, train_x[i, 0, :, :], t_eval, method='dopri5')
+            train_x_hat = odeint(model.time_derivative, train_x[i, 0, :, :], t_eval, method='rk4')            
             forward_time = time.time() - t
             train_loss_mini = L2_loss(train_x[i,:,:,:], train_x_hat)
             train_loss = train_loss + train_loss_mini
@@ -99,7 +100,7 @@ def train(args):
             backward_time = time.time() - t
 
             # run test data
-            test_x_hat = odeint(model.time_derivative, test_x[i, 0, :, :], t_eval, method='dopri5')
+            test_x_hat = odeint(model.time_derivative, test_x[i, 0, :, :], t_eval, method='rk4')
             test_loss_mini = L2_loss(test_x[i,:,:,:], test_x_hat)
             test_loss = test_loss + test_loss_mini
 
@@ -126,8 +127,8 @@ if __name__ == "__main__":
     os.makedirs(args.save_dir) if not os.path.exists(args.save_dir) else None
     label = '-baseline_ode' if args.baseline else '-hnn_ode'
     struct = '-struct' if args.structure else ''
-    path = '{}/{}{}{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points)
+    rad = '-rad' if args.rad else ''
+    path = '{}/{}{}{}-p{}{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points, rad)
     torch.save(model.state_dict(), path)
-
-    path = '{}/{}{}{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.num_points)
+    path = '{}/{}{}{}-p{}-stats{}.pkl'.format(args.save_dir, args.name, label, struct, args.num_points, rad)
     to_pickle(stats, path)

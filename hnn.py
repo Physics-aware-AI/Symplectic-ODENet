@@ -291,7 +291,7 @@ class HNN_structure_forcing(torch.nn.Module):
 
         self.device = device
         self.assume_canonical_coords = assume_canonical_coords
-        self.M = self.permutation_tensor(input_dim)
+        self.M = self.permutation_tensor(input_dim-1)
         self.nfe = 0
 
     def forward(self, x):
@@ -306,9 +306,9 @@ class HNN_structure_forcing(torch.nn.Module):
             # M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
             # M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
             # M_q_inv = M_q_inv.repeat(bs,1,1)
-
-            p_aug = torch.unsqueeze(p, dim=2)
-            H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+            H = p * p * M_q_inv / 2.0 + V_q
+            # p_aug = torch.unsqueeze(p, dim=2)
+            # H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
         else:
             H = self.H_net(x)
 
@@ -316,29 +316,30 @@ class HNN_structure_forcing(torch.nn.Module):
 
     def time_derivative(self, t, x):
         self.nfe += 1
+        q, p, u = torch.chunk(x, 3, dim=1)
+        q_p = torch.cat((q,p), dim=1)
         if self.baseline:
-            dq, dp , _ =  torch.chunk(self.H_net(x), 3, dim=1)
+
+            dq, dp=  torch.chunk(self.H_net(q_p), 2, dim=1)
             return torch.cat((dq, dp, torch.zeros_like(dq)), dim=1)
         if self.structure:
             bs = x.shape[0]
-
-            q, p, u = torch.chunk(x, 3, dim=1)
+            q, p = torch.chunk(q_p, 2, dim=1)
             V_q = self.V_net(q)
             M_q_inv = self.M_net(q)
             # M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
             # M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
             # M_q_inv = M_q_inv.repeat(bs,1,1)
-
-            p_aug = torch.unsqueeze(p, dim=2)
-            H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+            H = p * p * M_q_inv / 2.0 + V_q
+            # p_aug = torch.unsqueeze(p, dim=2)
+            # H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
         else:
-            q, p, u = torch.chunk(x, 3, dim=1)
-            H = self.H_net(x)
-        dH = torch.autograd.grad(H.sum(), x, create_graph=True)[0]
-        # H_vector_field = torch.matmul(dH, self.M.t())
-        dHdq, dHdp, _ = torch.chunk(dH, 3, dim=1)
-        H_vector_field = torch.cat((dHdp, -dHdq, torch.zeros_like(dHdq)), dim=1)
-
+            H = self.H_net(q_p)
+        dH = torch.autograd.grad(H.sum(), q_p, create_graph=True)[0]
+        H_vector_field = torch.matmul(dH, self.M.t())
+        # dHdq, dHdp= torch.chunk(dH, 2, dim=1)
+        # H_vector_field = torch.cat((dHdp, -dHdq, torch.zeros_like(dHdq)), dim=1)
+        H_vector_field = torch.cat((H_vector_field, torch.zeros_like(H_vector_field)[:,0].view(-1,1)), dim=1)
         g_q = self.g_net(q)
 
         F = g_q * u

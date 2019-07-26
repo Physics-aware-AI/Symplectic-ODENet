@@ -103,3 +103,11 @@ I started with the 6D q and p as training data for a single pendulum, trying to 
 The constraint force is the most challenging part. Implementing the implicit form in Vincent's PhD thesis didn't work well. The method is not satisfactory in the beginning.
 
 The key 
+
+
+# learning the forcing function
+These set of experiments are aiming at learning the hamiltonian dynamics as well as the forcing function. 
+
+With only training data of three set of forcing [-1, 0, 1], the learnt dynamics are not satisfatory. An inspection of the learnt g_q function in hnn_ode_model reveals that g_q is a linear function of q, almost constant and varies from 0.11-0.09 in the range we are interested in. While the true g_q should be a constant 1.0, the learnt model is largly wrong and I think the learnt Hamiltonian is wrong too. In the hnn_ode_struct_model, g_q is varies between 0.02 and -0.05. The next step is to try to refine the training dataset and see the learnt g_q. 
+
+with training data of forcing $us=np.linspace(-1.0, 1.0, 10)$, I still can't learn a good model.
