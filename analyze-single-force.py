@@ -47,41 +47,41 @@ class ObjectView(object):
 args = ObjectView(get_args())
 
 #%% [markdown]
-# ## Inspect the dataset
+## Inspect the dataset
 # We can either set initial condition to be the same or different for different forces
 #%%
-# data = get_dataset(seed=args.seed, gym=False, save_dir=args.save_dir, us=[-1.0, 0.0, 1.0])
-# print(data['x'].shape)
+data = get_dataset(seed=args.seed, gym=True, save_dir=args.save_dir, us=[-1.0, 0.0, 1.0])
+print(data['x'].shape)
 
 #%%
-# t = 0
-# q_01 = data['x'][0,t,:,0] ; p_01 = data['x'][0,t,:,1]
-# q_02 = data['x'][1,t,:,0] ; p_02 = data['x'][1,t,:,1]
-# q_03 = data['x'][2,t,:,0] ; p_03 = data['x'][2,t,:,1]
+t = 0
+q_01 = data['x'][0,t,:,0] ; p_01 = data['x'][0,t,:,1]
+q_02 = data['x'][1,t,:,0] ; p_02 = data['x'][1,t,:,1]
+q_03 = data['x'][2,t,:,0] ; p_03 = data['x'][2,t,:,1]
 
-# for _ in range(0):
-#     fig = plt.figure(figsize=[12,3], dpi=DPI)
-#     plt.subplot(1, 3, 1)
-#     plt.scatter(q_01, p_01)
-#     plt.xlim(-3, 3)
-#     plt.ylim(-3, 3)
+for _ in range(0):
+    fig = plt.figure(figsize=[12,3], dpi=DPI)
+    plt.subplot(1, 3, 1)
+    plt.scatter(q_01, p_01)
+    plt.xlim(-3, 3)
+    plt.ylim(-3, 3)
 
-#     plt.subplot(1, 3, 2)
-#     plt.scatter(q_02, p_02)
-#     plt.xlim(-3, 3)
-#     plt.ylim(-3, 3)
+    plt.subplot(1, 3, 2)
+    plt.scatter(q_02, p_02)
+    plt.xlim(-3, 3)
+    plt.ylim(-3, 3)
 
-#     plt.subplot(1, 3, 3)
-#     plt.scatter(q_03, p_03)
-#     plt.xlim(-3, 3)
-#     plt.ylim(-3, 3)
+    plt.subplot(1, 3, 3)
+    plt.scatter(q_03, p_03)
+    plt.xlim(-3, 3)
+    plt.ylim(-3, 3)
 
-# train_q = data['x'][:,:,:,0].reshape(-1,1)
-# plt.hist(train_q, 20)
-# %%
-# this is an example of q goes to -28
-# fig = plt.figure(figsize=[12, 3], dpi=DPI)
-# plt.plot(data['x'][0,:, 4, 0])
+train_q = data['x'][:,:,:,0].reshape(-1,1)
+plt.hist(train_q, 20)
+#%%
+this is an example of q goes to -28
+fig = plt.figure(figsize=[12, 3], dpi=DPI)
+plt.plot(data['x'][0,:, 4, 0])
 
 #%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
@@ -305,185 +305,7 @@ plt.plot(t_eval.numpy(), y_traj[:, 2])
 
 #%%
 
-# MPC control
-from mpc import mpc
-from mpc.mpc import QuadCost, GradMethods
 
-n_batch, n_state, n_ctrl, T = 1, 2, 1, 40
-u_lower = 2.0 * torch.ones(T, n_batch, n_ctrl, dtype=torch.float32, device=device)
-u_upper = -2.0 * torch.ones(T, n_batch, n_ctrl, dtype=torch.float32, device=device)
-u_init = None #0.0 * torch.ones(T, n_batch, n_ctrl, dtype=torch.float32, device=device, requires_grad=True)
-x_init = torch.tensor([[0.2, 0]], dtype=torch.float32, device=device, requires_grad=True).view(n_batch, n_state)
-
-# cost
-C = torch.diag(torch.tensor([1.0, 1, 1], dtype=torch.float32, device=device)).view(1, 1, 3, 3)
-C = C.repeat(T, n_batch, 1, 1) 
-c = torch.tensor([0.0, 0.0, 0.0], dtype=torch.float32, device=device).view(1, 1, 3)
-c = c.repeat(T, n_batch, 1)
-
-# class Discrete_wrapper(torch.nn.Module):
-#     def __init__(self, diff_model):
-#         super(Discrete_wrapper, self).__init__()
-#         self.diff_model = diff_model
-
-#     def forward(self, x, u): 
-#         # y0_u = torch.cat((x, u), dim = 1)
-#         with torch.enable_grad():
-#             y0_u = torch.zeros(1, 3, dtype=torch.float32, requires_grad=True, device=device)
-#             # y0_u = torch.tensor([[0.0, 0.0, 0.0]], requires_grad=True, device=device)
-#             y0_u[:, 0:2] = x
-#             y0_u[:, 2] = torch.squeeze(u)
-#             y_step = odeint(self.diff_model, y0_u, torch.linspace(0.0, 0.1, 2), method='rk4')
-#         return y_step[-1,:,0:2]
-
-
-# class True_discrete_dynamics(torch.nn.Module):
-#     def __init__(self):
-#         super(True_discrete_dynamics, self).__init__()
-#         self.assume_canonical_coords = True
-#         self.device = device
-#         self.M = self.permutation_tensor(2)
-        
-
-#     def forward(self, x, u):
-#         # with torch.enable_grad():
-#             # q_p = torch.zeros(x.shape, dtype=torch.float32, requires_grad=True, device=device)
-#             # q_p[:,:] = x.data
-#             # q, p = torch.chunk(q_p,2, dim=1)
-#             # H = 5*(1-torch.cos(q)) + 1.5 * p**2
-#             # dH = torch.autograd.grad(H.sum(), q_p, create_graph=True)[0]
-#             # H_vector_field = torch.matmul(dH, self.M.t())
-#             # F_vector_field = torch.cat((torch.zeros_like(u), u), dim=1)
-#             # return x + (H_vector_field + F_vector_field) * 0.05
-#         q, p = torch.chunk(x, 2, dim=1)
-#         return x + torch.cat((3*p, -5*torch.sin(q)+u), dim=1)*0.05
-
-#     def permutation_tensor(self, n):
-#         M = None
-#         if self.assume_canonical_coords:
-#             M = torch.eye(n)
-#             M = torch.cat([M[n//2:], -M[:n//2]])
-#         else:
-#             '''Constructs the Levi-Civita permutation tensor'''
-#             M = torch.ones(n,n) # matrix of ones
-#             M *= 1 - torch.eye(n) # clear diagonals
-#             M[::2] *= -1 # pattern of signs
-#             M[:,::2] *= -1
-
-#             for i in range(n): # make asymmetric
-#                 for j in range(i+1, n):
-#                     M[i,j] *= -1
-#         return M.to(self.device)
-
-# # discrete_hnn_struct = Discrete_wrapper(hnn_ode_struct_model.time_derivative)
-# discrete_hnn_struct = True_discrete_dynamics().to(device)
-# #%%
-# nominal_states, nominal_actions, nominal_objs = mpc.MPC(
-#     n_state=n_state, 
-#     n_ctrl=n_ctrl, 
-#     T=T,
-#     u_init=u_init,
-#     u_lower=u_lower,
-#     u_upper=u_upper,
-#     lqr_iter=50,
-#     verbose=1,
-#     n_batch=n_batch,
-#     exit_unconverged=False,
-#     detach_unconverged=False,
-#     grad_method=GradMethods.AUTO_DIFF,
-#     linesearch_decay=0.2, 
-#     max_linesearch_iter=5,
-#     eps=1e-2,
-# )(x_init, QuadCost(C, c), discrete_hnn_struct)
 
 #%%
 
-# 3D input
-n_batch, T, mpc_T = 1, 100, 20
-
-torch.manual_seed(0)
-th = torch.ones(n_batch, dtype=torch.float32) * 3.14
-thdot = torch.zeros(n_batch, dtype=torch.float32)
-xinit = torch.stack((torch.cos(th), torch.sin(th), thdot), dim=1)
-
-x = xinit
-u_init = None
-
-goal_weights = torch.Tensor((1., 1., 0.1))
-goal_state = torch.Tensor((1., 0. ,0.))
-ctrl_penalty = 0.001
-q = torch.cat((
-    goal_weights,
-    ctrl_penalty*torch.ones(1)
-))
-px = -torch.sqrt(goal_weights)*goal_state
-p = torch.cat((px, torch.zeros(1)))
-Q = torch.diag(q).unsqueeze(0).unsqueeze(0).repeat(
-    mpc_T, n_batch, 1, 1
-)
-p = p.unsqueeze(0).repeat(mpc_T, n_batch, 1)
-
-
-class True_discrete_dynamics(torch.nn.Module):
-    def __init__(self):
-        super(True_discrete_dynamics, self).__init__()
-        self.assume_canonical_coords = True
-        self.device = device
-        self.M = self.permutation_tensor(2)
-        
-
-    def forward(self, x, u):
-        # with torch.enable_grad():
-            # q_p = torch.zeros(x.shape, dtype=torch.float32, requires_grad=True, device=device)
-            # q_p[:,:] = x.data
-            # q, p = torch.chunk(q_p,2, dim=1)
-            # H = 5*(1-torch.cos(q)) + 1.5 * p**2
-            # dH = torch.autograd.grad(H.sum(), q_p, create_graph=True)[0]
-            # H_vector_field = torch.matmul(dH, self.M.t())
-            # F_vector_field = torch.cat((torch.zeros_like(u), u), dim=1)
-            # return x + (H_vector_field + F_vector_field) * 0.05
-        cos_q, sin_q, p = torch.chunk(x, 3, dim=1)
-        q = torch.atan2(sin_q, cos_q)
-        new_q = q + 3*p * 0.05
-        new_p = p + (u - 5*torch.sin(q)) * 0.05
-        return torch.cat((torch.cos(new_q), torch.sin(new_q), new_p), dim=1)
-
-    def permutation_tensor(self, n):
-        M = None
-        if self.assume_canonical_coords:
-            M = torch.eye(n)
-            M = torch.cat([M[n//2:], -M[:n//2]])
-        else:
-            '''Constructs the Levi-Civita permutation tensor'''
-            M = torch.ones(n,n) # matrix of ones
-            M *= 1 - torch.eye(n) # clear diagonals
-            M[::2] *= -1 # pattern of signs
-            M[:,::2] *= -1
-
-            for i in range(n): # make asymmetric
-                for j in range(i+1, n):
-                    M[i,j] *= -1
-        return M.to(self.device)
-
-# discrete_hnn_struct = Discrete_wrapper(hnn_ode_struct_model.time_derivative)
-discrete_hnn_struct = True_discrete_dynamics().to(device)
-#%%
-nominal_states, nominal_actions, nominal_objs = mpc.MPC(
-    n_state=n_state, 
-    n_ctrl=n_ctrl, 
-    T=mpc_T,
-    u_init=u_init,
-    u_lower=u_lower,
-    u_upper=u_upper,
-    lqr_iter=50,
-    verbose=1,
-    n_batch=n_batch,
-    exit_unconverged=False,
-    detach_unconverged=False,
-    grad_method=GradMethods.AUTO_DIFF,
-    linesearch_decay=0.2, 
-    max_linesearch_iter=5,
-    eps=1e-2,
-)(x, QuadCost(Q, p), discrete_hnn_struct)
-
-#%%

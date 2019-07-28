@@ -128,7 +128,8 @@ if __name__ == "__main__":
     label = '-baseline_ode' if args.baseline else '-hnn_ode'
     struct = '-struct' if args.structure else ''
     rad = '-rad' if args.rad else ''
-    path = '{}/{}{}{}-p{}{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points, rad)
+    gym_data = '-gym' if args.gym else ''
+    path = '{}/{}{}{}{}-p{}{}.tar'.format(args.save_dir, args.name, label, struct, gym_data, args.num_points, rad)
     torch.save(model.state_dict(), path)
-    path = '{}/{}{}{}-p{}-stats{}.pkl'.format(args.save_dir, args.name, label, struct, args.num_points, rad)
+    path = '{}/{}{}{}{}-p{}-stats{}.pkl'.format(args.save_dir, args.name, label, struct, gym_data, args.num_points, rad)
     to_pickle(stats, path)

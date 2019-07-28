@@ -54,19 +54,15 @@ def get_theta(cos, sin):
     return theta
 
 
-def get_q_p(obs):
+def get_q_p(obs, u):
     '''construct q and p from gym observations of Pendulum-v0'''
-    x = - 0.5 * obs[1]
-    y = 0.5 * obs[0]
-    theta = get_theta(-obs[0], -obs[1])
-    p_x = - 0.5 * obs[0] * obs[2]
-    p_y = - 0.5 * obs[1] * obs[2]
-    p_theta = obs[2] / 12.0  # p_theta in the COM
-    return np.array([x, y, theta, p_x, p_y, p_theta])
+    q = np.arctan2(obs[1], obs[0])
+    p = obs[2] / 3.0
+    return np.array([q, p, u])
 
 
-def sample_gym(seed=0, timesteps=103, trials=200, side=28, min_angle=0., max_angle=np.pi/6, 
-              verbose=False, env_name='Pendulum-v0'):
+def sample_gym(seed=0, timesteps=60, trials=50, side=28, min_angle=0., max_angle=np.pi/6, 
+              verbose=False, u=0.0, env_name='Pendulum-v0'):
     
     gym_settings = locals()
     if verbose:
@@ -79,26 +75,26 @@ def sample_gym(seed=0, timesteps=103, trials=200, side=28, min_angle=0., max_ang
         traj = []
         for step in range(timesteps):
 
-            if step == 0:
-                angle_ok = False
+            # if step == 0:
+            #     angle_ok = False
 
-                while not angle_ok:
-                    obs = env.reset()
-                    theta_init = np.abs(get_theta(-obs[0], -obs[1]))
-                    if verbose:
-                        print("\tCalled reset. Max angle= {:.3f}".format(theta_init))
-                    if theta_init > min_angle and theta_init < max_angle:
-                        angle_ok = True
-                if verbose:
-                    print("\tRunning environment...")
+            #     while not angle_ok:
+            #         obs = env.reset()
+            #         theta_init = np.abs(get_theta(-obs[0], -obs[1]))
+            #         if verbose:
+            #             print("\tCalled reset. Max angle= {:.3f}".format(theta_init))
+            #         if theta_init > min_angle and theta_init < max_angle:
+            #             angle_ok = True
+            #     if verbose:
+            #         print("\tRunning environment...")
             
-            obs, _, _, _ = env.step([0.0]) # no action
-            x = get_q_p(obs)
+            obs, _, _, _ = env.step([u]) # action
+            x = get_q_p(obs, u)
             traj.append(x)
         traj = np.stack(traj)
         trajs.append(traj)
-    trajs = np.stack(trajs) # (trials, timesteps, 6)
-    trajs = np.transpose(trajs, (1, 0, 2)) # (timesteps, trails, 6)
+    trajs = np.stack(trajs) # (trials, timesteps, 2)
+    trajs = np.transpose(trajs, (1, 0, 2)) # (timesteps, trails, 2)
     tspan = np.arange(timesteps) * 0.05
     return trajs, tspan, gym_settings
 
@@ -107,16 +103,23 @@ def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us
 
     if gym:
         assert save_dir is not None
-        path = '{}/acrobot-gym-dataset.pkl'.format(save_dir)
+        path = '{}/pendulum-gym-dataset.pkl'.format(save_dir)
         try:
             data = from_pickle(path)
             print("Successfully loaded data from {}".format(path))
         except:
             print("Had a problem loading data from {}. Rebuilding dataset...".format(path))
+            trajs_force = []
+            for u in us:
+                trajs, tspan, _ = sample_gym(seed=seed, trials=samples, u=u, **kwargs)
+                trajs_force.append(trajs)
+            data['x'] = np.stack(trajs_force, axis=0) # (3, 45, 50, 3)
+            # make a train/test split
+            split_ix = int(samples * test_split)
+            split_data = {}
+            split_data['x'], split_data['test_x'] = data['x'][:,:,:split_ix,:], data['x'][:,:,split_ix:,:]
 
-            trajs, tspan, _ = sample_gym(seed=seed, trials=samples, **kwargs)
-            split_ix = int(trajs.shape[1]*test_split)
-            data['x'], data['test_x'] = trajs[:, split_ix:, :], trajs[:, :split_ix, :]
+            data = split_data
             data['t'] = tspan
 
             to_pickle(data, path)
