@@ -18,7 +18,7 @@ import time
 
 def get_args():
     parser = argparse.ArgumentParser(description=None)
-    parser.add_argument('--input_dim', default=3, type=int, help='dimensionality of input tensor')
+    parser.add_argument('--input_dim', default=2, type=int, help='dimensionality of input tensor')
     parser.add_argument('--hidden_dim', default=600, type=int, help='hidden dimension of mlp')
     parser.add_argument('--learn_rate', default=1e-3, type=float, help='learning rate')
     parser.add_argument('--nonlinearity', default='tanh', type=str, help='neural net nonlinearity')
@@ -42,7 +42,7 @@ def train(args):
     from torchdiffeq import odeint
 
     device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
-
+    # device = torch.device('cpu')
     # reproducibility: set random seed
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -57,15 +57,15 @@ def train(args):
             print("using the structured Hamiltonian")
     
     if args.structure == False:
-        output_dim = args.input_dim-1 if args.baseline else 1
-        nn_model = MLP(args.input_dim-1, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        g_net = MLP(int(args.input_dim/3), args.hidden_dim, int(args.input_dim/3)).to(device)
+        output_dim = args.input_dim if args.baseline else 1
+        nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
+        g_net = MLP(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
         model = HNN_structure_forcing(args.input_dim, H_net=nn_model, g_net=g_net, device=device, baseline=args.baseline)
     elif args.structure == True and args.baseline ==False:
-    
-        M_net = MLP(1, args.hidden_dim, 1).to(device)
-        V_net = MLP(int(args.input_dim/3), 50, 1).to(device)
-        g_net = MLP(int(args.input_dim/3), args.hidden_dim, int(args.input_dim/3)).to(device)
+        # M_net = MLP(1, args.hidden_dim, 1).to(device)
+        M_net = MLP(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2))
+        V_net = MLP(int(args.input_dim/2), 50, 1).to(device)
+        g_net = MLP(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
         model = HNN_structure_forcing(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *baseline* and *structure* cannot both be true')
@@ -74,7 +74,10 @@ def train(args):
     optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
     # arrange data
-    data = get_dataset(seed=args.seed, gym=args.gym, save_dir=args.save_dir, rad=args.rad, us=[-2.0, -1.0, 0.0, 1.0, 2.0]) #us=np.linspace(-2.0, 2.0, 20)
+    us = [-2.0, -1.0, 0.0, 1.0, 2.0]
+    # us = [0.0]
+    data = get_dataset(seed=args.seed, gym=args.gym, 
+                    save_dir=args.save_dir, rad=args.rad, us=us, samples=100) #us=np.linspace(-2.0, 2.0, 20)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 

@@ -57,12 +57,12 @@ def get_theta(cos, sin):
 
 def get_q_p(obs, u):
     '''construct q and p from gym observations of Pendulum-v0'''
-    q = np.arctan2(-obs[1], -obs[0])
+    q = np.arctan2(obs[1], obs[0])
     p = obs[2] / 3.0
     return np.array([q, p, u])
 
 
-def sample_gym(seed=0, timesteps=60, trials=50, side=28, min_angle=0., max_angle=np.pi/6, 
+def sample_gym(seed=0, timesteps=10, trials=50, side=28, min_angle=0., max_angle=np.pi/6, 
               verbose=False, u=0.0, env_name='MyPendulum-v0'):
     
     gym_settings = locals()
@@ -77,13 +77,13 @@ def sample_gym(seed=0, timesteps=60, trials=50, side=28, min_angle=0., max_angle
         while not valid:
             env.reset()
             traj = []
-            for step in range(timesteps):             
+            for step in range(timesteps):
                 obs, _, _, _ = env.step([u]) # action
-                x = get_q_p(obs, u)
-                traj.append(x)
+                # x = np.concatenate((obs, np.array([u])))
+                traj.append(obs)
             traj = np.stack(traj)
-            if np.amax(traj[:, 1]) < 33.3 and np.amin(traj[:, 1]) > -33.3:
-                valid = True 
+            if np.amax(traj[:, 2]) < env.max_speed - 0.001  and np.amin(traj[:, 2]) > -env.max_speed + 0.001:
+                valid = True
         trajs.append(traj)
     trajs = np.stack(trajs) # (trials, timesteps, 2)
     trajs = np.transpose(trajs, (1, 0, 2)) # (timesteps, trails, 2)

@@ -8,6 +8,7 @@ import scipy.integrate
 solve_ivp = scipy.integrate.solve_ivp
 from utils import to_pickle, from_pickle
 import gym
+import myenv
 
 
 def get_theta(cos, sin):
@@ -31,73 +32,56 @@ def get_q_p(obs):
     return np.array([x1, y1, theta_1, x2, y2, theta_1+theta_2, x1_dot, y1_dot, obs[4]/12, x2_dot, y2_dot, (obs[4] + obs[5])/12])
 
 def sample_gym(seed=0, timesteps=103, trials=200, side=28, min_angle=0., max_angle=np.pi/6, 
-              verbose=False, env_name='Acrobot-v1'):
+              verbose=False, u=0.0, env_name='MyAcrobot-v0'):
     
     gym_settings = locals()
     if verbose:
         print("Making a dataset of Acrobat observations.")
     env: gym.wrappers.time_limit.TimeLimit = gym.make(env_name)
-    env.reset() ; env.seed(seed)
+    env.seed(seed)
 
     trajs = []
     for trial in range(trials):
-        traj = []
-        for step in range(timesteps):
-
-            if step == 0:
-                angle_ok = False
-
-                while not angle_ok:
-                    obs = env.reset()
-                    theta_init = np.abs(get_theta(obs[0], obs[1]))
-                    if verbose:
-                        print("\tCalled reset. Max angle= {:.3f}".format(theta_init))
-                    if theta_init > min_angle and theta_init < max_angle:
-                        angle_ok = True
-                if verbose:
-                    print("\tRunning environment...")
-            
-            obs, _, _, _ = env.step(1) # no action
-            x = get_q_p(obs)
-            traj.append(x)
-        traj = np.stack(traj)
+        valid = False
+        while not valid:
+            env.reset()
+            traj = []
+            for step in range(timesteps):
+                obs, _, _, _ = env.step(u) # no action
+                # x = get_q_p(obs)
+                traj.append(obs)
+            traj = np.stack(traj)
+            if np.amax(traj[:, 4]) < env.MAX_VEL_1 - 0.0001 and np.amin(traj[:, 4]) > -env.MAX_VEL_1 + 0.0001:
+                if np.amax(traj[:, 5]) < env.MAX_VEL_2 - 0.0001 and np.amin(traj[:, 5]) > -env.MAX_VEL_2 + 0.0001:
+                    valid = True
         trajs.append(traj)
     trajs = np.stack(trajs) # (trials, timesteps, 6)
     trajs = np.transpose(trajs, (1, 0, 2)) # (timesteps, trails, 6)
-    return trajs, gym_settings
+    tspan = np.arange(timesteps) * env.dt
+    return trajs, tspan, gym_settings
 
-
-def make_gym_dataset(test_split=0.2, **kwargs):
-    '''Constructs a dataset of observations from an OpenAI Gym env'''
-    trajs, gym_settings = sample_gym(**kwargs)
-
-    split_ix = int(trajs.shape[1]*test_split)
-    data = {}
-    data['train_x'], data['test_x'] = trajs[:, split_ix:, :], trajs[:, :split_ix, :]
-
-    return data
-
-
-def get_dataset(experiment_name, save_dir, **kwargs):
+def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us=[0], rad=False, **kwargs):
     '''Returns a dataset bult on top of OpenAI Gym observations. Also constructs
     the dataset if no saved version is available.'''
 
-    if experiment_name == "pendulum":
-        env_name = "Pendulum-v0"
-    elif experiment_name == "acrobot":
-        env_name = "Acrobot-v1"
-    else:
-        assert experiment_name in ['acrobot']
-
-    path = '{}/{}-gym-dataset.pkl'.format(save_dir, experiment_name)
-
+    path = '{}/{}-gym-dataset.pkl'.format(save_dir, 'MyAcrobot')
+    data = {}
     try:
         data = from_pickle(path)
         print("Successfully loaded data from {}".format(path))
     except:
         print("Had a problem loading data from {}. Rebuilding dataset...".format(path))
-        data = make_gym_dataset(**kwargs)
-        to_pickle(data,path)
+        trajs_force = []
+        for u in us:
+            trajs, tspan, _ = sample_gym(seed=seed, trials=samples, u=u, **kwargs)
+            trajs_force.append(trajs)
+        data['x'] = np.stack(trajs_force, axis=0)
+        split_ix = int(samples * test_split)
+        split_data = {}
+        split_data['x'], split_data['test_x'] = data['x'][:,:,:split_ix,:], data['x'][:,:,split_ix:,:]
+
+        data = split_data
+        data['t'] = tspan
 
     return data
 
@@ -134,11 +118,11 @@ def arrange_data(x, t, num_points=2):
     x_stack = []
     for i in range(num_points):
         if i < num_points-1:
-            x_stack.append(x[i:-num_points+i+1,:,:])
+            x_stack.append(x[:, i:-num_points+i+1,:,:])
         else:
-            x_stack.append(x[i:,:,:])
-    x_stack = np.stack(x_stack)
+            x_stack.append(x[:, i:,:,:])
+    x_stack = np.stack(x_stack, axis=1)
     x_stack = np.reshape(x_stack, 
-                (num_points, -1, x.shape[2]))
+                (x.shape[0], num_points, -1, x.shape[3]))
     t_eval = t[0:num_points]
     return x_stack, t_eval
