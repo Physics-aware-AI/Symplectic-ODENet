@@ -135,7 +135,7 @@ n_batch, n_state, n_ctrl, mpc_T, T = 1, 3, 1, 20, 60
 u_lower = -2.0 * torch.ones(mpc_T, n_batch, n_ctrl, dtype=torch.float32, device=device)
 u_upper = 2.0 * torch.ones(mpc_T, n_batch, n_ctrl, dtype=torch.float32, device=device)
 u_init = None #0.0 * torch.ones(T, n_batch, n_ctrl, dtype=torch.float32, device=device, requires_grad=True)
-# x_init = torch.tensor([[np.cos(np.pi), np.sin(np.pi), 0]], dtype=torch.float32, device=device, requires_grad=True).view(n_batch, n_state)
+x_init = torch.tensor([[np.cos(0), np.sin(0), 0]], dtype=torch.float32, device=device, requires_grad=True).view(n_batch, n_state)
 
 # cost
 C = torch.diag(torch.tensor([1.0, 1, 1, 0.01], dtype=torch.float32, device=device)).view(1, 1, 4, 4)
@@ -143,9 +143,10 @@ C = C.repeat(mpc_T, n_batch, 1, 1)
 c = torch.tensor([-1., 0.0, 0.0, 0.0], dtype=torch.float32, device=device).view(1, 1, 4)
 c = c.repeat(mpc_T, n_batch, 1)
 
-env.reset()
-env.state = np.array([0.0, 0.0], dtype=np.float32)
-x = env._get_obs()
+# env.reset()
+# env.state = np.array([0.0, 0.0], dtype=np.float32)
+# x = env._get_obs()
+x = x_init
 
 actual_action = []
 actual_states = []
@@ -168,12 +169,13 @@ for t in tqdm(range(T)):
         linesearch_decay=0.2, 
         max_linesearch_iter=5,
         eps=1e-2,
-    )(tensor_x, QuadCost(C, c), discrete_hnn_ode_struct_model)
+    )(tensor_x, QuadCost(C, c), discrete_hnn_ode_model)
 
     u_init = torch.cat((nominal_actions[1:], torch.zeros(1, n_batch, n_ctrl, device=device)), dim=0)
     next_action = nominal_actions[0].detach().cpu().numpy()
     # env.render()
-    x, _, _, _ = env.step(next_action[0])
+    # x, _, _, _ = env.step(next_action[0])
+    x = discrete_hnn_ode_struct_model(x, nominal_actions[0])
 
     actual_action.append(next_action[0])
     actual_states.append(x)

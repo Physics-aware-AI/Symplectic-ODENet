@@ -364,3 +364,134 @@ class HNN_structure_forcing(torch.nn.Module):
                 for j in range(i+1, n):
                     M[i,j] *= -1
         return M.to(self.device)
+
+
+class HNN_structure_embed(torch.nn.Module):
+    def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None,
+            device=None, baseline=False, structure=False, naive=False):
+        super(HNN_structure_embed, self).__init__()
+        self.baseline = baseline
+        self.structure = structure
+        self.naive = naive
+        self.M_net = M_net
+        if self.structure:
+            self.V_net = V_net
+            self.g_net = g_net
+        else:
+            self.H_net = H_net
+            self.g_net = g_net
+
+        self.device = device
+        self.nfe = 0
+        self.input_dim = input_dim
+
+    def forward(self, t, x):
+        with torch.enable_grad():
+            self.nfe += 1
+            bs = x.shape[0]
+            zero_vec = torch.zeros(bs, 1, dtype=torch.float32, device =self.device)
+
+            if self.naive:
+                return torch.cat((self.H_net(x), zero_vec), dim=1)
+
+            cos_q_sin_q, q_dot, u = torch.split(x, [2, 1, 1], dim=1)
+            M_q_inv = self.M_net(cos_q_sin_q)
+            p = q_dot / M_q_inv
+            cos_q_sin_q_p = torch.cat((cos_q_sin_q, p), dim=1)
+            cos_q_sin_q, p = torch.split(cos_q_sin_q_p, [2, 1], dim=1)
+            M_q_inv = self.M_net(cos_q_sin_q)
+            cos_q, sin_q = torch.chunk(cos_q_sin_q, 2,dim=1)
+
+            # M_q_inv = 3 * torch.ones_like(u)
+
+            if self.baseline:
+                dq, dp=  torch.chunk(self.H_net(x), 2, dim=1)
+            else:
+                if self.structure:
+                    V_q = self.V_net(cos_q_sin_q)   
+                    if self.input_dim == 1:
+                        H = p * p * M_q_inv/ 2.0 + V_q
+                    else:
+                        assert 1 == 0
+                        p_aug = torch.unsqueeze(p, dim=2)
+                        H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+                else:
+                    H = self.H_net(cos_q_sin_q_p)
+                dH = torch.autograd.grad(H.sum(), cos_q_sin_q_p, create_graph=True)[0]
+                dHdcos_q, dHdsin_q, dHdp= torch.chunk(dH, 3, dim=1)
+                g_q = self.g_net(cos_q_sin_q)
+                F = g_q * u
+                # F = 3*u
+                # F = u
+
+                dq = dHdp
+                dp = sin_q * dHdcos_q - cos_q * dHdsin_q + F
+
+            dM_inv = torch.autograd.grad(M_q_inv.sum(), cos_q_sin_q, create_graph=True)[0]
+            dM_inv_dt = (dM_inv * torch.cat((-sin_q * dq, cos_q * dq), dim=1)).sum(-1).view(-1, 1)
+
+            ddq =  M_q_inv * dp  + dM_inv_dt * p
+
+            return torch.cat((-sin_q * dq, cos_q * dq, ddq, zero_vec), dim=1)
+
+
+    def get_H(self, x):
+        cos_q_sin_q, q_dot, u = torch.split(x, [2, 1, 1], dim=1)
+        M_q_inv = self.M_net(cos_q_sin_q)
+        p = q_dot / M_q_inv
+        cos_q_sin_q_p = torch.cat((cos_q_sin_q, p), dim=1)
+        cos_q_sin_q, p = torch.split(cos_q_sin_q_p, [2, 1], dim=1)
+        M_q_inv = self.M_net(cos_q_sin_q)
+        cos_q, sin_q = torch.chunk(cos_q_sin_q, 2,dim=1)
+        if self.structure:
+            V_q = self.V_net(cos_q_sin_q)   
+            if self.input_dim == 1:
+                H = p * p * M_q_inv/ 2.0 + V_q
+            else:
+                assert 1 == 0
+                p_aug = torch.unsqueeze(p, dim=2)
+                H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+        else:
+            H = self.H_net(cos_q_sin_q_p)
+
+        return H
+    
+    
+    def get_dqdp(self, x):
+        self.nfe += 1
+        bs = x.shape[0]
+        zero_vec = torch.zeros(bs, 1, dtype=torch.float32, device =self.device)
+
+        if self.naive:
+            raise RuntimeError('*naive* ode does not support vector field.')
+
+        cos_q_sin_q, q_dot, u = torch.split(x, [2, 1, 1], dim=1)
+        M_q_inv = self.M_net(cos_q_sin_q)
+        p = q_dot / M_q_inv
+        cos_q_sin_q_p = torch.cat((cos_q_sin_q, p), dim=1)
+        cos_q_sin_q, p = torch.split(cos_q_sin_q_p, [2, 1], dim=1)
+        M_q_inv = self.M_net(cos_q_sin_q)
+        cos_q, sin_q = torch.chunk(cos_q_sin_q, 2,dim=1)
+
+        if self.baseline:
+            dq, dp=  torch.chunk(self.H_net(x), 2, dim=1)
+        else:
+            if self.structure:
+                V_q = self.V_net(cos_q_sin_q)   
+                if self.input_dim == 1:
+                    H = p * p * M_q_inv / 2.0 + V_q
+                else:
+                    assert 1 == 0
+                    p_aug = torch.unsqueeze(p, dim=2)
+                    H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
+            else:
+                H = self.H_net(cos_q_sin_q_p)
+            dH = torch.autograd.grad(H.sum(), cos_q_sin_q_p, create_graph=True)[0]
+            dHdcos_q, dHdsin_q, dHdp= torch.chunk(dH, 3, dim=1)
+            g_q = self.g_net(cos_q_sin_q)
+            F = g_q * u
+
+            dq = dHdp
+            dp = sin_q * dHdcos_q - cos_q * dHdsin_q + F
+
+        return torch.cat((dq, dp), dim=1)

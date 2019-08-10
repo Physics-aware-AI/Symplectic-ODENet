@@ -3,6 +3,8 @@ from gym import spaces
 from gym.utils import seeding
 import numpy as np
 from os import path
+import scipy.integrate
+solve_ivp = scipy.integrate.solve_ivp
 
 class PendulumEnv(gym.Env):
     metadata = {
@@ -12,7 +14,7 @@ class PendulumEnv(gym.Env):
 
     def __init__(self, g=10.0):
         self.max_speed=100.
-        self.max_torque=2.
+        self.max_torque=5.
         self.dt=.05
         self.g = g
         self.viewer = None
@@ -27,6 +29,16 @@ class PendulumEnv(gym.Env):
         self.np_random, seed = seeding.np_random(seed)
         return [seed]
 
+    def dynamics(self, t, y, u):
+        g = self.g
+        m = 1.
+        l = 1.
+
+        f = np.zeros_like(y)
+        f[0] = y[1]
+        f[1] = (-3*g/(2*l) * np.sin(y[0] + np.pi) + 3./(m*l**2)*u)
+        return f
+
     def step(self,u):
         th, thdot = self.state # th := theta
 
@@ -39,11 +51,14 @@ class PendulumEnv(gym.Env):
         self.last_u = u # for rendering
         costs = angle_normalize(th)**2 + .1*thdot**2 + .001*(u**2)
 
-        newthdot = thdot + (-3*g/(2*l) * np.sin(th + np.pi) + 3./(m*l**2)*u) * dt
-        newth = th + newthdot*dt
-        newthdot = np.clip(newthdot, -self.max_speed, self.max_speed) #pylint: disable=E1111
+        ivp = solve_ivp(fun=lambda t, y:self.dynamics(t, y, u), t_span=[0, self.dt], y0=self.state)
+        self.state = ivp.y[:, -1]
 
-        self.state = np.array([newth, newthdot])
+        # newthdot = thdot + (-3*g/(2*l) * np.sin(th + np.pi) + 3./(m*l**2)*u) * dt
+        # newth = th + newthdot*dt
+        # newthdot = np.clip(newthdot, -self.max_speed, self.max_speed) #pylint: disable=E1111
+
+        # self.state = np.array([newth, newthdot])
         return self._get_obs(), -costs, False, {}
 
     def reset(self):

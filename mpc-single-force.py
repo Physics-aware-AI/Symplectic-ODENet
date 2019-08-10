@@ -88,7 +88,7 @@ n_batch, n_state, n_ctrl, mpc_T, T = 1, 3, 1, 20, 160
 u_lower = -2.0 * torch.ones(mpc_T, n_batch, n_ctrl, dtype=torch.float32, device=device)
 u_upper = 2.0 * torch.ones(mpc_T, n_batch, n_ctrl, dtype=torch.float32, device=device)
 u_init = None #1.0 * torch.ones(T, n_batch, n_ctrl, dtype=torch.float32, device=device, requires_grad=True)
-x_init = torch.tensor([[np.cos(3.14), np.sin(3.14), 0]], dtype=torch.float32, device=device, requires_grad=True).view(n_batch, n_state)
+x_init = torch.tensor([[np.cos(3.14/2), np.sin(3.14/2), 0]], dtype=torch.float32, device=device, requires_grad=True).view(n_batch, n_state)
 
 # cost
 C = torch.diag(torch.tensor([1.0, 1, 1, 0.01], dtype=torch.float32, device=device)).view(1, 1, 4, 4)
@@ -169,7 +169,7 @@ from time import time
 import myenv
 
 # set gym env
-env: gym.wrappers.time_limit.TimeLimit = gym.make('MyPendulum-v0')
+env = gym.make('MyPendulum-v0')
 # env = gym.wrappers.Monitor(env, './videos/' + str(time()) + '/') 
 env.seed(0)
 env.reset()
@@ -184,6 +184,7 @@ actual_states = []
 actual_states.append(x)
 for t in tqdm(range(T)):
     tensor_x = torch.tensor(x, dtype=torch.float32, device=device).view(1, 3)
+    # tensor_x = x
     nominal_states, nominal_actions, nominal_objs = mpc.MPC(
         n_state=n_state, 
         n_ctrl=n_ctrl, 
@@ -201,12 +202,12 @@ for t in tqdm(range(T)):
         max_linesearch_iter=5,
         eps=1e-2,
     )(tensor_x, QuadCost(C, c), discrete_hnn_struct)
-
+    # env.render()
     u_init = torch.cat((nominal_actions[1:], torch.zeros(1, n_batch, n_ctrl, device=device)), dim=0)
     next_action = nominal_actions[0].detach().cpu().numpy()
     # x = discrete_hnn_struct(x, nominal_actions[0])
     x, _, _, _ = env.step(next_action[0])
-
+    print(next_action)
     actual_action.append(next_action[0])
     actual_states.append(x)
 
