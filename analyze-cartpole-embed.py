@@ -48,25 +48,28 @@ args = ObjectView(get_args())
 # device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 device = torch.device('cpu')
 def get_model(args, baseline, structure, naive, damping, num_points):
-    M_net = PSD(3, args.hidden_dim, 2).to(device)
-    g_net = MLP(3, args.hidden_dim, 2).to(device)
+    M_net = PSD(3, 400, 2).to(device)
+    g_net = MLP(3, 300, 2).to(device)
     if structure == False:
         if naive and baseline:
             raise RuntimeError('argument *baseline* and *naive* cannot both be true')
         elif naive:
             input_dim = 6
             output_dim = 5
+            nn_model = MLP(input_dim, 1000, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, device=device, baseline=baseline, naive=naive)
         elif baseline:
             input_dim = 6
             output_dim = 4
+            nn_model = MLP(input_dim, 600, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
         else:
             input_dim = 5
             output_dim = 1
-        nn_model = MLP(input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=
-        naive)
+            nn_model = MLP(input_dim, 500, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
     elif structure == True and baseline ==False and naive==False:
-        V_net = MLP(3, 800, 1).to(device)
+        V_net = MLP(3, 300, 1).to(device)
         model = HNN_structure_cart_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
@@ -78,14 +81,37 @@ def get_model(args, baseline, structure, naive, damping, num_points):
     else:
         label = '-hnn_ode'
     struct = '-struct' if structure else ''
-    path = '{}/{}{}{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points)
+    path = '{}/{}{}{}-{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
     model.load_state_dict(torch.load(path, map_location=device))
-    return model
+    path = '{}/{}{}{}-{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
+    stats = from_pickle(path)
+    return model, stats
 
-# naive_ode_model = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
-base_ode_model = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_model = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_struct_model = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
+# naive_ode_model, naive_ode_stats = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
+base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
+hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
+hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
+
+#%%
+def get_model_parm_nums(model):
+    total = sum([param.nelement() for param in model.parameters()])
+    return total
+
+# get final traning loss
+print('Baseline_ode contains {} parameters'.format(get_model_parm_nums(base_ode_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(base_ode_stats['traj_train_loss']), np.std(base_ode_stats['traj_train_loss']),
+        np.mean(base_ode_stats['traj_test_loss']), np.std(base_ode_stats['traj_test_loss'])))
+print('')
+print('HNN_ode contains {} parameters'.format(get_model_parm_nums(hnn_ode_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_ode_stats['traj_train_loss']), np.std(hnn_ode_stats['traj_train_loss']),
+        np.mean(hnn_ode_stats['traj_test_loss']), np.std(hnn_ode_stats['traj_test_loss'])))
+print('')
+print('HNN_structure_ode contains {} parameters'.format(get_model_parm_nums(hnn_ode_struct_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_ode_struct_stats['traj_train_loss']), np.std(hnn_ode_struct_stats['traj_train_loss']),
+        np.mean(hnn_ode_struct_stats['traj_test_loss']), np.std(hnn_ode_struct_stats['traj_test_loss'])))
 
 #%%
 # check training dataset

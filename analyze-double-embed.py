@@ -25,7 +25,6 @@ LINE_WIDTH = 2
 
 def get_args():
     return {'num_angle': 2,
-         'hidden_dim': 800,
          'learn_rate': 1e-3,
          'nonlinearity': 'tanh',
          'total_steps': 2000,
@@ -37,7 +36,8 @@ def get_args():
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
          'num_points': 2,
-         'gpu': 2}
+         'gpu': 2,
+         'solver': 'rk4'}
 
 class ObjectView(object):
     def __init__(self, d): self.__dict__ = d
@@ -47,24 +47,28 @@ args = ObjectView(get_args())
 #%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 def get_model(args, baseline, structure, naive, damping, num_points):
-    M_net = PSD(2*args.num_angle, args.hidden_dim, args.num_angle).to(device)
-    g_net = MLP(2*args.num_angle, args.hidden_dim, args.num_angle).to(device)
+    M_net = PSD(2*args.num_angle, 400, args.num_angle).to(device)
+    g_net = MLP(2*args.num_angle, 300, args.num_angle).to(device)
     if structure == False:
         if naive and baseline:
             raise RuntimeError('argument *baseline* and *naive* cannot both be true')
         elif naive:
             input_dim = 3 * args.num_angle + 1
             output_dim = 3 * args.num_angle
+            nn_model = MLP(input_dim, 1000, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_embed(args.num_angle, H_net=nn_model, device=device, baseline=baseline, naive=naive)
         elif baseline:
             input_dim = 3 * args.num_angle + 1
             output_dim = 2 * args.num_angle
+            nn_model = MLP(input_dim, 800, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
         else:
             input_dim = 3 * args.num_angle
             output_dim = 1
-        nn_model = MLP(input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
+            nn_model = MLP(input_dim, 600, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
     elif structure == True and baseline ==False and naive==False:
-        V_net = MLP(2*args.num_angle, 800, 1).to(device)
+        V_net = MLP(2*args.num_angle, 200, 1).to(device)
         model = HNN_structure_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
@@ -76,14 +80,16 @@ def get_model(args, baseline, structure, naive, damping, num_points):
     else:
         label = '-hnn_ode'
     struct = '-struct' if structure else ''
-    path = '{}/{}{}{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points)
+    path = '{}/{}{}{}-{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
     model.load_state_dict(torch.load(path, map_location=device))
-    return model
+    path = '{}/{}{}{}-{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
+    stats = from_pickle(path)
+    return model, stats
 
-# naive_ode_model = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
-# base_ode_model = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
-# hnn_ode_model = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_struct_model = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
+# naive_ode_model, naive_ode_stats = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
+# base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
+# hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
+hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
 
 
 #%%
@@ -125,7 +131,7 @@ for _ in range(0):
 #%% [markdown]
 # ## Integrate along vector fields
 #%%
-# from torchdiffeq import odeint_adjoint as ode_int 
+# from torchdiffeq import odeint_adjoint as odeint 
 from torchdiffeq import odeint
 def integrate_model(model, t_span, y0, **kwargs):
     

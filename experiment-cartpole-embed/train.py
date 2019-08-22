@@ -17,7 +17,6 @@ def get_args():
     parser = argparse.ArgumentParser(description=None)
     parser.add_argument('--num_angle', default=1, type=int, help='number of angular coordinates')
     parser.add_argument('--num_cart', default=1, type=int, help='number of Cartesian coordinates')
-    parser.add_argument('--hidden_dim', default=800, type=int, help='hidden dimension of mlp')
     parser.add_argument('--learn_rate', default=1e-4, type=float, help='learning rate')
     parser.add_argument('--nonlinearity', default='tanh', type=str, help='neural net nonlinearity')
     parser.add_argument('--total_steps', default=2000, type=int, help='number of gradient steps')
@@ -31,8 +30,13 @@ def get_args():
     parser.add_argument('--num_points', type=int, default=2, help='number of evaluation points by the ODE solver, including the initial point')
     parser.add_argument('--structure', dest='structure', action='store_true', help='using a structured Hamiltonian')
     parser.add_argument('--naive', dest='naive', action='store_true', help='use a naive baseline')
+    parser.add_argument('--solver', default='rk4', type=str, help='type of ODE Solver for Neural ODE')
     parser.set_defaults(feature=True)
     return parser.parse_args()
+
+def get_model_parm_nums(model):
+    total = sum([param.nelement() for param in model.parameters()])
+    return total
 
 def train(args):
     # import ODENet
@@ -54,27 +58,34 @@ def train(args):
         if args.structure:
             print("using the structured Hamiltonian")
 
-    M_net = PSD(3, args.hidden_dim, 2).to(device)
-    g_net = MLP(3, args.hidden_dim, 2).to(device)
+    M_net = PSD(3, 400, 2).to(device)
+    g_net = MLP(3, 300, 2).to(device)
     if args.structure == False:
         if args.naive and args.baseline:
             raise RuntimeError('argument *baseline* and *naive* cannot both be true')
         elif args.naive:
             input_dim = 6
             output_dim = 5
+            nn_model = MLP(input_dim, 1000, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, device=device, baseline=args.baseline, naive=args.naive)
         elif args.baseline:
             input_dim = 6
             output_dim = 4
+            nn_model = MLP(input_dim, 700, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=args.baseline, naive=args.naive)
         else:
             input_dim = 5
             output_dim = 1
-        nn_model = MLP(input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=args.baseline, naive=args.naive)
+            nn_model = MLP(input_dim, 500, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=args.baseline, naive=args.naive)
     elif args.structure == True and args.baseline ==False and args.naive==False:
-        V_net = MLP(3, 800, 1).to(device)
+        V_net = MLP(3, 300, 1).to(device)
         model = HNN_structure_cart_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
+
+    num_parm = get_model_parm_nums(model)
+    print('model contains {} parameters'.format(num_parm))
 
     optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
@@ -104,7 +115,7 @@ def train(args):
             # for j in range(int(bs/mini_bs)+1):
             #     bs_ind = np.random.choice(bs, mini_bs)
             t = time.time()
-            train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method='rk4') # (4, 25*44, 2)
+            train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver) # (4, 25*44, 2)
             forward_time = time.time() - t
             train_loss_mini = L2_loss(train_x[i,:,:,:], train_x_hat)
             train_loss = train_loss + train_loss_mini 
@@ -115,7 +126,7 @@ def train(args):
             backward_time = time.time() - t
 
             # run test data
-            test_x_hat = odeint(model, test_x[i, 0, :, :], t_eval, method='rk4')
+            test_x_hat = odeint(model, test_x[i, 0, :, :], t_eval, method=args.solver)
             test_loss_mini = L2_loss(test_x[i,:,:,:], test_x_hat)
             test_loss = test_loss + test_loss_mini
 
@@ -127,6 +138,39 @@ def train(args):
         stats['nfe'].append(model.nfe)
         if args.verbose and step % args.print_every == 0:
             print("step {}, train_loss {:.4e}, test_loss {:.4e}".format(step, train_loss.item(), test_loss.item()))
+
+    # calculate loss mean and std for each traj.
+    train_x, t_eval = data['x'], data['t']
+    test_x, t_eval = data['test_x'], data['t']
+
+    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
+    test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
+    t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
+
+    train_loss = []
+    test_loss = []
+    for i in range(train_x.shape[0]):
+        train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver)            
+        train_loss.append((train_x[i,:,:,:] - train_x_hat)**2)
+
+        # run test data
+        test_x_hat = odeint(model, test_x[i, 0, :, :], t_eval, method=args.solver)
+        test_loss.append((test_x[i,:,:,:] - test_x_hat)**2)
+
+    train_loss = torch.cat(train_loss, dim=1)
+    train_dist = torch.sqrt(torch.sum(train_loss, dim=2))
+    mean_train_dist = torch.sum(train_dist, dim=0) / train_dist.shape[0]
+
+    test_loss = torch.cat(test_loss, dim=1)
+    test_dist = torch.sqrt(torch.sum(test_loss, dim=2))
+    mean_test_dist = torch.sum(test_dist, dim=0) / test_dist.shape[0]
+
+    print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+    .format(mean_train_dist.mean().item(), mean_train_dist.std().item(),
+            mean_test_dist.mean().item(), mean_test_dist.std().item()))
+
+    stats['traj_train_loss'] = mean_train_dist.detach().cpu().numpy()
+    stats['traj_test_loss'] = mean_test_dist.detach().cpu().numpy()
 
     return model, stats
 
@@ -144,7 +188,7 @@ if __name__ == "__main__":
     else:
         label = '-hnn_ode'
     struct = '-struct' if args.structure else ''
-    path = '{}/{}{}{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points)
+    path = '{}/{}{}{}-{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
     torch.save(model.state_dict(), path)
-    path = '{}/{}{}{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.num_points)
+    path = '{}/{}{}{}-{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
     to_pickle(stats, path)

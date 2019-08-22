@@ -66,12 +66,12 @@ def train(args):
         if args.naive and args.baseline:
             raise RuntimeError('argument *baseline* and *naive* cannot both be true')
         elif args.naive:
-            input_dim = 4 * args.num_angle
+            input_dim = 3 * args.num_angle + 1
             output_dim = 3 * args.num_angle
             nn_model = MLP(input_dim, 800, output_dim, args.nonlinearity).to(device)
             model = HNN_structure_embed(args.num_angle, H_net=nn_model, device=device, baseline=args.baseline, naive=args.naive)
         elif args.baseline:
-            input_dim = 4 * args.num_angle
+            input_dim = 3 * args.num_angle + 1
             output_dim = 2 * args.num_angle
             nn_model = MLP(input_dim, 600, output_dim, args.nonlinearity).to(device)
             model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=args.baseline, naive=args.naive)

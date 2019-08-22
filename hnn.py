@@ -295,26 +295,6 @@ class HNN_structure_forcing(torch.nn.Module):
         self.nfe = 0
         self.input_dim = input_dim
 
-    # def forward(self, x):
-    #     if self.baseline:
-    #         return self.H_net(x)
-    #     if self.structure:
-    #         bs = x.shape[0]
-
-    #         q, p, u = torch.chunk(x, 3, dim=1)
-    #         V_q = self.V_net(q)
-    #         M_q_inv = self.M_net(q)
-    #         # M_q_inv = torch.tensor([1.0, 1.0, 12.0], dtype=torch.float32, device=self.device)
-    #         # M_q_inv = torch.unsqueeze(torch.diag_embed(M_q_inv), dim=0)
-    #         # M_q_inv = M_q_inv.repeat(bs,1,1)
-    #         H = p * p * M_q_inv / 2.0 + V_q
-    #         # p_aug = torch.unsqueeze(p, dim=2)
-    #         # H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
-    #     else:
-    #         H = self.H_net(x)
-
-    #     return H
-
     def forward(self, t, x):
         with torch.enable_grad():
             one = torch.tensor(1, dtype=torch.float32, device=self.device, requires_grad=True)
