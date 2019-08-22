@@ -36,8 +36,9 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 3,
-         'gpu': 0}
+         'num_points': 4,
+         'gpu': 3,
+         'solver': 'rk4'}
 
 class ObjectView(object):
     def __init__(self, d): self.__dict__ = d
@@ -47,22 +48,26 @@ args = ObjectView(get_args())
 #%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 def get_model(args, baseline, structure, naive, damping, num_points):
-    M_net = PSD(2*args.num_angle, args.hidden_dim, args.num_angle).to(device)
-    g_net = MLP(2*args.num_angle, args.hidden_dim, args.num_angle).to(device)
+    M_net = PSD(2*args.num_angle, 300, args.num_angle).to(device)
+    g_net = MLP(2*args.num_angle, 200, args.num_angle).to(device)
     if structure == False:
         if naive and baseline:
             raise RuntimeError('argument *baseline* and *naive* cannot both be true')
         elif naive:
             input_dim = 4 * args.num_angle
             output_dim = 3 * args.num_angle
+            nn_model = MLP(input_dim, 800, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_embed(args.num_angle, H_net=nn_model, device=device, baseline=baseline, naive=naive)
         elif baseline:
             input_dim = 4 * args.num_angle
             output_dim = 2 * args.num_angle
+            nn_model = MLP(input_dim, 600, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
         else:
             input_dim = 3 * args.num_angle
             output_dim = 1
-        nn_model = MLP(input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
+            nn_model = MLP(input_dim, 500, output_dim, args.nonlinearity).to(device)
+            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
     elif structure == True and baseline ==False and naive==False:
         V_net = MLP(2*args.num_angle, 50, 1).to(device)
         model = HNN_structure_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
@@ -76,15 +81,37 @@ def get_model(args, baseline, structure, naive, damping, num_points):
     else:
         label = '-hnn_ode'
     struct = '-struct' if structure else ''
-    path = '{}/{}{}{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.num_points)
+    path = '{}/{}{}{}-{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
     model.load_state_dict(torch.load(path, map_location=device))
-    return model
+    path = '{}/{}{}{}-{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
+    stats = from_pickle(path)
+    return model, stats
 
-# naive_ode_model = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
-base_ode_model = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_model = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_struct_model = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
+# naive_ode_model, naive_ode_stats = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
+base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
+hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
+hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
 
+#%%
+def get_model_parm_nums(model):
+    total = sum([param.nelement() for param in model.parameters()])
+    return total
+
+# get final traning loss
+print('Baseline_ode contains {} parameters'.format(get_model_parm_nums(base_ode_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(base_ode_stats['traj_train_loss']), np.std(base_ode_stats['traj_train_loss']),
+        np.mean(base_ode_stats['traj_test_loss']), np.std(base_ode_stats['traj_test_loss'])))
+print('')
+print('HNN_ode contains {} parameters'.format(get_model_parm_nums(hnn_ode_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_ode_stats['traj_train_loss']), np.std(hnn_ode_stats['traj_train_loss']),
+        np.mean(hnn_ode_stats['traj_test_loss']), np.std(hnn_ode_stats['traj_test_loss'])))
+print('')
+print('HNN_structure_ode contains {} parameters'.format(get_model_parm_nums(hnn_ode_struct_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_ode_struct_stats['traj_train_loss']), np.std(hnn_ode_struct_stats['traj_train_loss']),
+        np.mean(hnn_ode_struct_stats['traj_test_loss']), np.std(hnn_ode_struct_stats['traj_test_loss'])))
 
 #%% [markdown]
 # ## Integrate along vector fields
@@ -109,7 +136,7 @@ t_linspace_model = np.linspace(t_span[0], t_span[1], n_eval)
 # angle info for simuation
 init_angle = 0.5
 y0 = np.asarray([init_angle, 0])
-u0 = -2.0
+u0 = 0.0
 y0_u = np.asarray([np.cos(init_angle), np.sin(init_angle), 0, u0])
 # simulate
 kwargs = {'t_eval': t_linspace_model, 'rtol': 1e-12, 'method': 'RK45'}
@@ -180,7 +207,7 @@ def get_vector_field(model, u=0, **kwargs):
 
 # get their vector fields
 R = 3.6
-kwargs = {'xmin': -R, 'xmax': R, 'ymin': -R, 'ymax': R, 'gridsize': args.gridsize, 'u': 0}
+kwargs = {'xmin': -R, 'xmax': R, 'ymin': -R, 'ymax': R, 'gridsize': args.gridsize, 'u': u0}
 field = get_field(**kwargs)
 # data = get_dataset(radius=2.0)
 base_field = get_vector_field(base_ode_model, **kwargs)
@@ -240,6 +267,10 @@ for _ in range(1):
     plt.xlim(-R, R)
     plt.ylim(-R, R)
 
+    # plt.tight_layout() ; plt.show()
+    # fig.savefig('{}/pend-single-embed-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
+
+
 #%%
 # plot learnt function
 q = np.linspace(-5.0, 5.0, 40)
@@ -249,11 +280,11 @@ cos_q_sin_q = torch.cat((-torch.cos(q_tensor), -torch.sin(q_tensor)), dim=1)
 for _ in range(1):
     fig = plt.figure(figsize=(20, 6.4), dpi=DPI)
     g_q = hnn_ode_model.g_net(cos_q_sin_q)
-    plt.subplot(2, 4, 1)
-    plt.plot(q, g_q.detach().cpu().numpy())
-    plt.xlabel("$q$", fontsize=14)
-    plt.ylabel("$g_q$", rotation=0, fontsize=14)
-    plt.title("g_q - Hamiltonian ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
+    # plt.subplot(2, 4, 1)
+    # plt.plot(q, g_q.detach().cpu().numpy())
+    # plt.xlabel("$q$", fontsize=14)
+    # plt.ylabel("$g_q$", rotation=0, fontsize=14)
+    # plt.title("g_q - Hamiltonian ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
 
 
     g_q = hnn_ode_struct_model.g_net(cos_q_sin_q)
@@ -279,18 +310,22 @@ for _ in range(1):
     plt.title("V_q - Hamiltonian structured ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
 
     M_q_inv = hnn_ode_model.M_net(cos_q_sin_q)
-    plt.subplot(2, 4, 5)
-    plt.plot(q, M_q_inv.detach().cpu().numpy())
-    plt.xlabel("$q$", fontsize=14)
-    plt.ylabel("$Mq_inv$", rotation=0, fontsize=14)
-    plt.title("Mq_inv - Hamiltonian ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
+    # plt.subplot(2, 4, 5)
+    # plt.plot(q, M_q_inv.detach().cpu().numpy())
+    # plt.xlabel("$q$", fontsize=14)
+    # plt.ylabel("$Mq_inv$", rotation=0, fontsize=14)
+    # plt.title("Mq_inv - Hamiltonian ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
 
     M_q_inv = base_ode_model.M_net(cos_q_sin_q)
-    plt.subplot(2, 4, 6)
-    plt.plot(q, M_q_inv.detach().cpu().numpy())
-    plt.xlabel("$q$", fontsize=14)
-    plt.ylabel("$Mq_inv$", rotation=0, fontsize=14)
-    plt.title("Mq_inv - Baseline ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
+    # plt.subplot(2, 4, 6)
+    # plt.plot(q, M_q_inv.detach().cpu().numpy())
+    # plt.xlabel("$q$", fontsize=14)
+    # plt.ylabel("$Mq_inv$", rotation=0, fontsize=14)
+    # plt.title("Mq_inv - Baseline ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
+    
+    # plt.tight_layout() ; plt.show()
+    # fig.savefig('{}/pend-single-embed-learnt-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
+
 
 
 
@@ -325,19 +360,19 @@ plt.plot(t_linspace_model, E_hnn_struct, 'y')
 # this plot must add naive baseline for comparison.
 #%%
 # check conserved quantity of hnn and hnn_struct
-struct_H_hnn_struct = hnn_ode_struct_model.get_H(hnn_struct_traj)
-struct_H_base = hnn_ode_struct_model.get_H(base_traj)
-struct_H_hnn = hnn_ode_struct_model.get_H(hnn_traj)
-struct_H_true = hnn_ode_struct_model.get_H(true_traj)
+struct_H_hnn_struct, _ = hnn_ode_struct_model.get_H(hnn_struct_traj)
+struct_H_base, _ = hnn_ode_struct_model.get_H(base_traj)
+struct_H_hnn, _ = hnn_ode_struct_model.get_H(hnn_traj)
+struct_H_true, _ = hnn_ode_struct_model.get_H(true_traj)
 plt.plot(t_linspace_model, struct_H_hnn_struct.detach().cpu().numpy())
 plt.plot(t_linspace_model, struct_H_hnn.detach().cpu().numpy())
 plt.plot(t_linspace_model, struct_H_base.detach().cpu().numpy())
 plt.plot(t_linspace_true, struct_H_true.detach().cpu().numpy())
 #%%
-H_hnn_struct = hnn_ode_model.get_H(hnn_struct_traj)
-H_base = hnn_ode_model.get_H(base_traj)
-H_hnn = hnn_ode_model.get_H(hnn_traj)
-H_true = hnn_ode_model.get_H(true_traj)
+H_hnn_struct, _ = hnn_ode_model.get_H(hnn_struct_traj)
+H_base, _ = hnn_ode_model.get_H(base_traj)
+H_hnn, _ = hnn_ode_model.get_H(hnn_traj)
+H_true, _ = hnn_ode_model.get_H(true_traj)
 plt.plot(t_linspace_model, H_hnn_struct.detach().cpu().numpy())
 plt.plot(t_linspace_model, H_hnn.detach().cpu().numpy())
 plt.plot(t_linspace_model, H_base.detach().cpu().numpy())
@@ -347,12 +382,30 @@ plt.plot(t_linspace_true, H_true.detach().cpu().numpy())
 
 #%%
 # vanilla control
-t_span = [0,10]
-y0 = torch.tensor([-1., 0, 0, 0], requires_grad=True, device=device, dtype=torch.float32).view(1, 4)
-t_eval = torch.linspace(t_span[0], t_span[1], 100)
-rtol = 1e-12
-y = y0
-k_p = 1 ; k_d = 2
+# time info for simualtion
+time_step = 100 ; n_eval = 100
+t_span = [0,time_step*0.05]
+t_eval = torch.linspace(t_span[0], t_span[1], n_eval)
+# t_linspace_true = np.linspace(t_span[0], time_step, time_step)*0.05
+# t_linspace_model = np.linspace(t_span[0], t_span[1], n_eval)
+# angle info for simuation
+init_angle = 3.14
+u0 = 0.0
+
+# generate initial condition from gym
+import gym 
+import myenv
+env = gym.make('MyPendulum-v0')
+env.reset()
+env.state = np.array([init_angle, u0], dtype=np.float32)
+obs = env._get_obs()
+y = torch.tensor([obs[0], obs[1], obs[2], u0], requires_grad=True, device=device, dtype=torch.float32).view(1, 4)
+# manually generate initial condition
+# y0 = torch.tensor([np.cos(init_angle), np.sin(init_angle), 0, u0], requires_grad=True, device=device, dtype=torch.float32).view(1, 4)
+# rtol = 1e-12
+# y = y0
+
+k_p = 1 ; k_d = 3
 y_traj = []
 y_traj.append(y)
 for i in range(len(t_eval)-1):
@@ -365,11 +418,19 @@ for i in range(len(t_eval)-1):
     M_inv = hnn_ode_struct_model.M_net(cos_q_sin_q)
     q = torch.atan2(sin_q, cos_q)
 
-    u = M_inv * (dV_q - k_p * (cos_q - 1) - k_p * (sin_q) - k_d * q_dot)
+    # u = (dV_q - k_p * (cos_q - 1) - k_p * (sin_q) - k_d * q_dot)
     # u = M_inv * (dV_q - k_p * q - k_d * q_dot)
-    y0_u = torch.cat((cos_q_sin_q, q_dot, u), dim = 1)
-    y_step = odeint(hnn_ode_struct_model, y0_u, t_eval[i:i+2], method='rk4')
-    y = y_step[-1,:,:]
+    u = (2*dV_q  - k_d * q_dot)
+
+    # use openai simulator
+    u = u.detach().cpu().numpy()
+    obs, _, _, _ = env.step(u)
+    y = torch.tensor([obs[0], obs[1], obs[2], u], requires_grad=True, device=device, dtype=torch.float32).view(1, 4)
+    # use learnt model
+    # y0_u = torch.cat((cos_q_sin_q, q_dot, u), dim = 1)
+    # y_step = odeint(hnn_ode_struct_model, y0_u, t_eval[i:i+2], method='rk4')
+    # y = y_step[-1,:,:]
+
     y_traj.append(y)
 
 y_traj = torch.stack(y_traj).view(-1, 4).detach().cpu().numpy()
@@ -382,15 +443,22 @@ y_traj = torch.stack(y_traj).view(-1, 4).detach().cpu().numpy()
 fig = plt.figure(figsize=[10, 10], dpi=DPI)
 plt.subplot(4, 1, 1)
 plt.plot(t_eval.numpy(), y_traj[:, 0])
+plt.ylabel('$cos(q)$', fontsize=14)
 
 plt.subplot(4, 1, 2)
 plt.plot(t_eval.numpy(), y_traj[:, 1])
+plt.ylabel('$sin(q)$', fontsize=14)
 
 plt.subplot(4, 1, 3)
 plt.plot(t_eval.numpy(), y_traj[:, 2])
+plt.ylabel('$\dot{q}$', fontsize=14)
 
 plt.subplot(4, 1, 4)
 plt.plot(t_eval.numpy(), y_traj[:, 2])
+plt.ylabel('$u$', fontsize=14)
+
+plt.tight_layout() ; plt.show()
+fig.savefig('{}/pend-single-embed-ctrl-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
 
 
 #%%

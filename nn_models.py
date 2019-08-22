@@ -45,8 +45,8 @@ class PSD(torch.nn.Module):
             self.off_diag_dim = int(diag_dim * (diag_dim - 1) / 2)
             self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
             self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
-            self.linear3 = torch.nn.Linear(hidden_dim, self.off_diag_dim)
-            self.linear4 = torch.nn.Linear(hidden_dim, diag_dim)
+            self.linear3 = torch.nn.Linear(hidden_dim, hidden_dim)
+            self.linear4 = torch.nn.Linear(hidden_dim, self.diag_dim + self.off_diag_dim)
 
             for l in [self.linear1, self.linear2, self.linear3, self.linear4]:
                 torch.nn.init.orthogonal_(l.weight) # use a principled initialization
@@ -63,9 +63,9 @@ class PSD(torch.nn.Module):
             bs = q.shape[0]
             h = self.nonlinearity( self.linear1(q) )
             h = self.nonlinearity( self.linear2(h) )
-            diag = self.linear4(h)
+            h = self.nonlinearity( self.linear3(h) )
+            diag, off_diag = torch.split(self.linear4(h), [self.diag_dim, self.off_diag_dim], dim=1)
             # diag = torch.nn.functional.relu( self.linear4(h) )
-            off_diag = self.linear3(h)
 
             L = torch.diag_embed(diag)
 
@@ -76,6 +76,8 @@ class PSD(torch.nn.Module):
             L = torch.reshape(L, (bs, self.diag_dim, self.diag_dim))
 
             D = torch.bmm(L, L.permute(0, 2, 1))
+            D[:, 0, 0] = D[:, 0, 0] + 0.1
+            D[:, 1, 1] = D[:, 1, 1] + 0.1
             return D
 
 

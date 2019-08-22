@@ -29,7 +29,6 @@ def get_args():
          'learn_rate': 1e-3,
          'nonlinearity': 'tanh',
          'total_steps': 2000,
-         'field_type': 'solenoidal',
          'print_every': 200,
          'name': 'pend',
          'gridsize': 10,
@@ -38,7 +37,8 @@ def get_args():
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
          'num_points': 4,
-         'gpu': 0,
+         'gpu': 3,
+         'solver': 'rk4',
          'rad': False,
          'gym': False}
 
@@ -114,30 +114,55 @@ for _ in range(0):
 #%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 def get_model(args, baseline, structure, damping, num_points, gym=False):
-    if structure == False:
-        output_dim = args.input_dim if baseline else 1
-        nn_model = MLP(args.input_dim, args.hidden_dim, output_dim, args.nonlinearity).to(device)
-        g_net = MLP(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
-        model = HNN_structure_forcing(args.input_dim, H_net=nn_model, g_net=g_net, device=device, baseline=baseline)
+    if structure == False and baseline == True:
+        nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity).to(device)    
+        model = HNN_structure_forcing(args.input_dim, H_net=nn_model, device=device, baseline=True)
+    elif structure == False and baseline == False:
+        H_net = MLP(args.input_dim, 400, 1, args.nonlinearity).to(device)
+        g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2)).to(device)
+        model = HNN_structure_forcing(args.input_dim, H_net=H_net, g_net=g_net, device=device, baseline=False)
     elif structure == True and baseline ==False:
-    
-        M_net = MLP(1, args.hidden_dim, 1).to(device)
+        # M_net = MLP(1, args.hidden_dim, 1).to(device)
+        M_net = MLP(int(args.input_dim/2), 300, int(args.input_dim/2))
         V_net = MLP(int(args.input_dim/2), 50, 1).to(device)
-        g_net = MLP(int(args.input_dim/2), args.hidden_dim, int(args.input_dim/2)).to(device)
-        model = HNN_structure_forcing(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
+        g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2)).to(device)
+        model = HNN_structure_forcing(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=False, structure=True).to(device)
     else:
         raise RuntimeError('argument *baseline* and *structure* cannot both be true')
     model_name = 'baseline_ode' if baseline else 'hnn_ode'
     struct = '-struct' if structure else ''
     rad = '-rad' if args.rad else ''
-    gym_data = '-gym' if gym else ''
-    path = '{}pend-{}{}{}-p{}{}.tar'.format(args.save_dir, model_name, struct, gym_data, num_points, rad)
+    path = '{}pend-{}{}-{}-p{}{}.tar'.format(args.save_dir, model_name, struct, args.solver, num_points, rad)
     model.load_state_dict(torch.load(path, map_location=device))
-    return model
+    path = '{}/pend-{}{}-{}-p{}-stats{}.pkl'.format(args.save_dir, model_name, struct, args.solver, num_points, rad)
+    stats = from_pickle(path)
+    return model, stats
 
-base_ode_model = get_model(args, baseline=True, structure=False, damping=False, num_points=args.num_points, gym=args.gym)
-hnn_ode_model = get_model(args, baseline=False, structure=False, damping=False, num_points=args.num_points, gym=args.gym)
-hnn_ode_struct_model = get_model(args, baseline=False, structure=True, damping=False, num_points=args.num_points, gym=args.gym)
+base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False, damping=False, num_points=args.num_points, gym=args.gym)
+hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, damping=False, num_points=args.num_points, gym=args.gym)
+hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, damping=False, num_points=args.num_points, gym=args.gym)
+#%%
+# get number of parameters and final traning loss
+def get_model_parm_nums(model):
+    total = sum([param.nelement() for param in model.parameters()])
+    return total
+
+
+print('Baseline_ode contains {} parameters'.format(get_model_parm_nums(base_ode_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(base_ode_stats['traj_train_loss']), np.std(base_ode_stats['traj_train_loss']),
+        np.mean(base_ode_stats['traj_test_loss']), np.std(base_ode_stats['traj_test_loss'])))
+print('')
+print('HNN_ode contains {} parameters'.format(get_model_parm_nums(hnn_ode_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_ode_stats['traj_train_loss']), np.std(hnn_ode_stats['traj_train_loss']),
+        np.mean(hnn_ode_stats['traj_test_loss']), np.std(hnn_ode_stats['traj_test_loss'])))
+print('')
+print('HNN_structure_ode contains {} parameters'.format(get_model_parm_nums(hnn_ode_struct_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_ode_struct_stats['traj_train_loss']), np.std(hnn_ode_struct_stats['traj_train_loss']),
+        np.mean(hnn_ode_struct_stats['traj_test_loss']), np.std(hnn_ode_struct_stats['traj_test_loss'])))
+
 
 #%% [markdown]
 # ## Integrate along vector fields
@@ -148,14 +173,14 @@ def integrate_model(model, t_span, y0, **kwargs):
     
     def fun(t, np_x):
         x = torch.tensor( np_x, requires_grad=True, dtype=torch.float32).view(1,3).to(device)
-        dx = model.time_derivative(0, x).detach().cpu().numpy().reshape(-1)
+        dx = model(0, x).detach().cpu().numpy().reshape(-1)
         return dx
 
     return solve_ivp(fun=fun, t_span=t_span, y0=y0, **kwargs)
 
 t_span = [0,28]
 y0 = np.asarray([2.1, 0])
-u0 = 1.0
+u0 = 0.0
 y0_u = np.asarray([2.1, 0, u0])
 kwargs = {'t_eval': np.linspace(t_span[0], t_span[1], 1000), 'rtol': 1e-12}
 base_ivp = integrate_model(base_ode_model, t_span, y0_u, **kwargs)
@@ -164,21 +189,21 @@ hnn_struct_ivp = integrate_model(hnn_ode_struct_model, t_span, y0_u, **kwargs)
 
 
 #%%
-# get vector filed of different model
-def get_vector_field(model, **kwargs):
+# get vector field of different model
+def get_vector_field(model, u=0, **kwargs):
     field = get_field(**kwargs)
     np_mesh_x = field['x']
     
     # run model
     mesh_x = torch.tensor( np_mesh_x, requires_grad=True, dtype=torch.float32).to(device)
-    mesh_x_aug = torch.cat((mesh_x, torch.zeros_like(mesh_x)[:,0].view(-1, 1)), dim=1)
-    mesh_dx_aug = model.time_derivative(0, mesh_x_aug)
+    mesh_x_aug = torch.cat((mesh_x, u * torch.ones_like(mesh_x)[:,0].view(-1, 1)), dim=1)
+    mesh_dx_aug = model(0, mesh_x_aug)
     mesh_dx = mesh_dx_aug[:, 0:2]
     return mesh_dx.detach().cpu().numpy()
 
 # get their vector fields
 R = 3.6
-kwargs = {'xmin': -R, 'xmax': R, 'ymin': -R, 'ymax': R, 'gridsize': args.gridsize, 'u': -2.0}
+kwargs = {'xmin': -R, 'xmax': R, 'ymin': -R, 'ymax': R, 'gridsize': args.gridsize, 'u': u0}
 field = get_field(**kwargs)
 # data = get_dataset(radius=2.0)
 base_field = get_vector_field(base_ode_model, **kwargs)
@@ -235,9 +260,9 @@ for _ in range(1):
     plt.ylim(-R, R)
 
     plt.subplot(1, 4, 4)
-    # for i, l in enumerate(np.split(hnn_struct_ivp['y'].T, LINE_SEGMENTS)):
-    #     color = (float(i)/LINE_SEGMENTS, 0, 1-float(i)/LINE_SEGMENTS)
-    #     plt.plot(l[:,0],l[:,1],color=color, linewidth=LINE_WIDTH)
+    for i, l in enumerate(np.split(hnn_struct_ivp['y'].T, LINE_SEGMENTS)):
+        color = (float(i)/LINE_SEGMENTS, 0, 1-float(i)/LINE_SEGMENTS)
+        plt.plot(l[:,0],l[:,1],color=color, linewidth=LINE_WIDTH)
 
     plt.quiver(field['x'][:,0], field['x'][:,1], hnn_struct_field[:,0], hnn_struct_field[:,1],
             cmap='gray_r', scale=ARROW_SCALE, width=ARROW_WIDTH, color=(.5,.5,.5))
@@ -248,6 +273,7 @@ for _ in range(1):
     plt.xlim(-R, R)
     plt.ylim(-R, R)
 
+# fig.savefig('{}/pend-single-force-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
 #%%
 # plot leanrt function
 
@@ -285,6 +311,8 @@ for _ in range(1):
     plt.xlabel("$q$", fontsize=14)
     plt.ylabel("$V_q$", rotation=0, fontsize=14)
     plt.title("V_q - Hamiltonian structured ODE NN ({})".format(args.num_points), pad=10, fontsize=14)
+
+    # fig.savefig('{}/pend-single-learnt-fun-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
 
 
 #%%

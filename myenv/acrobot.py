@@ -60,7 +60,7 @@ class AcrobotEnv(core.Env):
         'video.frames_per_second' : 15
     }
 
-    dt = .2
+    dt = .05
 
     LINK_LENGTH_1 = 1.  # [m]
     LINK_LENGTH_2 = 1.  # [m]
@@ -87,7 +87,7 @@ class AcrobotEnv(core.Env):
         self.viewer = None
         high = np.array([1.0, 1.0, 1.0, 1.0, self.MAX_VEL_1, self.MAX_VEL_2])
         low = -high
-        high_a = np.array([5.0])
+        high_a = np.array([15.0])
         low_a = -high_a
         self.observation_space = spaces.Box(low=low, high=high, dtype=np.float32)
         self.action_space = spaces.Box(low=low_a, high=high_a, dtype=np.float32)
@@ -99,7 +99,7 @@ class AcrobotEnv(core.Env):
         return [seed]
 
     def reset(self):
-        self.state = self.np_random.uniform(low=-0.1, high=0.1, size=(4,))
+        self.state = self.np_random.uniform(low=-3.14, high=3.14, size=(4,))
         return self._get_ob()
 
     def step(self, a):
@@ -107,8 +107,8 @@ class AcrobotEnv(core.Env):
         torque = a
 
         # Add noise to the force action
-        if self.torque_noise_max > 0:
-            torque += self.np_random.uniform(-self.torque_noise_max, self.torque_noise_max)
+        # if self.torque_noise_max > 0:
+        #     torque += self.np_random.uniform(-self.torque_noise_max, self.torque_noise_max)
 
         # Now, augment the state with our force action so it can be passed to
         # _dsdt
@@ -123,10 +123,10 @@ class AcrobotEnv(core.Env):
         # self.s_continuous = ns_continuous[-1] # We only care about the state
         # at the ''final timestep'', self.dt
 
-        ns[0] = wrap(ns[0], -pi, pi)
-        ns[1] = wrap(ns[1], -pi, pi)
-        ns[2] = bound(ns[2], -self.MAX_VEL_1, self.MAX_VEL_1)
-        ns[3] = bound(ns[3], -self.MAX_VEL_2, self.MAX_VEL_2)
+        # ns[0] = wrap(ns[0], -pi, pi)
+        # ns[1] = wrap(ns[1], -pi, pi)
+        # ns[2] = bound(ns[2], -self.MAX_VEL_1, self.MAX_VEL_1)
+        # ns[3] = bound(ns[3], -self.MAX_VEL_2, self.MAX_VEL_2)
         self.state = ns
         terminal = self._terminal()
         reward = -1. if not terminal else 0.
