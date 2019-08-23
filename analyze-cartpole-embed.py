@@ -36,8 +36,9 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 3,
-         'gpu': 2}
+         'num_points': 2,
+         'gpu': 2,
+         'solver': 'rk4'}
 
 class ObjectView(object):
     def __init__(self, d): self.__dict__ = d
@@ -61,7 +62,7 @@ def get_model(args, baseline, structure, naive, damping, num_points):
         elif baseline:
             input_dim = 6
             output_dim = 4
-            nn_model = MLP(input_dim, 600, output_dim, args.nonlinearity).to(device)
+            nn_model = MLP(input_dim, 700, output_dim, args.nonlinearity).to(device)
             model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
         else:
             input_dim = 5
