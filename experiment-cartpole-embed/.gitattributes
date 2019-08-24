@@ -1,1 +1,2 @@
 *rk4* filter=lfs diff=lfs merge=lfs -text
+*dopri5* filter=lfs diff=lfs merge=lfs -text
