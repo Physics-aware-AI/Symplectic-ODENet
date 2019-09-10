@@ -36,9 +36,9 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 4,
+         'num_points': 5,
          'gpu': 3,
-         'solver': 'rk4',
+         'solver': 'dopri5',
          'rad': False,
          'gym': False}
 

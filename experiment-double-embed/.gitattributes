@@ -23,3 +23,11 @@ pend-hnn_ode-struct-dopri5-p3-stats.pkl filter=lfs diff=lfs merge=lfs -text
 pend-hnn_ode-struct-dopri5-p3.tar filter=lfs diff=lfs merge=lfs -text
 pend-hnn_ode-struct-dopri5-p4-stats.pkl filter=lfs diff=lfs merge=lfs -text
 pend-hnn_ode-struct-dopri5-p4.tar filter=lfs diff=lfs merge=lfs -text
+pend-naive_ode-dopri5-p5.tar filter=lfs diff=lfs merge=lfs -text
+pend-baseline_ode-dopri5-p5-stats.pkl filter=lfs diff=lfs merge=lfs -text
+pend-baseline_ode-dopri5-p5.tar filter=lfs diff=lfs merge=lfs -text
+pend-hnn_ode-dopri5-p5-stats.pkl filter=lfs diff=lfs merge=lfs -text
+pend-hnn_ode-dopri5-p5.tar filter=lfs diff=lfs merge=lfs -text
+pend-hnn_ode-struct-dopri5-p5-stats.pkl filter=lfs diff=lfs merge=lfs -text
+pend-hnn_ode-struct-dopri5-p5.tar filter=lfs diff=lfs merge=lfs -text
+pend-naive_ode-dopri5-p5-stats.pkl filter=lfs diff=lfs merge=lfs -text

@@ -36,9 +36,9 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 4,
+         'num_points': 5,
          'gpu': 3,
-         'solver': 'rk4'}
+         'solver': 'dopri5'}
 
 class ObjectView(object):
     def __init__(self, d): self.__dict__ = d
@@ -87,7 +87,7 @@ def get_model(args, baseline, structure, naive, damping, num_points):
     stats = from_pickle(path)
     return model, stats
 
-# naive_ode_model, naive_ode_stats = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
+naive_ode_model, naive_ode_stats = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
 base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
 hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
 hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
@@ -98,6 +98,11 @@ def get_model_parm_nums(model):
     return total
 
 # get final traning loss
+print('Naive_ode contains {} parameters'.format(get_model_parm_nums(naive_ode_model)))
+print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
+.format(np.mean(naive_ode_stats['traj_train_loss']), np.std(naive_ode_stats['traj_train_loss']),
+        np.mean(naive_ode_stats['traj_test_loss']), np.std(naive_ode_stats['traj_test_loss'])))
+print('')
 print('Baseline_ode contains {} parameters'.format(get_model_parm_nums(base_ode_model)))
 print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
 .format(np.mean(base_ode_stats['traj_train_loss']), np.std(base_ode_stats['traj_train_loss']),
