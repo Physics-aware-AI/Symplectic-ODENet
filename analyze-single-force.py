@@ -21,7 +21,7 @@ FORMAT = 'png'
 LINE_SEGMENTS = 10
 ARROW_SCALE = 40
 ARROW_WIDTH = 6e-3
-LINE_WIDTH = 2
+LINE_WIDTH = 1
 
 def get_args():
     return {'input_dim': 2,
@@ -142,7 +142,7 @@ base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False,
 hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, damping=False, num_points=args.num_points, gym=args.gym)
 hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, damping=False, num_points=args.num_points, gym=args.gym)
 #%%
-# get number of parameters and final traning loss
+# get number of parameters and final training loss
 def get_model_parm_nums(model):
     total = sum([param.nelement() for param in model.parameters()])
     return total
@@ -179,9 +179,9 @@ def integrate_model(model, t_span, y0, **kwargs):
     return solve_ivp(fun=fun, t_span=t_span, y0=y0, **kwargs)
 
 t_span = [0,28]
-y0 = np.asarray([2.1, 0])
+y0 = np.asarray([1.8, 0])
 u0 = 0.0
-y0_u = np.asarray([2.1, 0, u0])
+y0_u = np.asarray([1.8, 0, u0])
 kwargs = {'t_eval': np.linspace(t_span[0], t_span[1], 1000), 'rtol': 1e-12}
 base_ivp = integrate_model(base_ode_model, t_span, y0_u, **kwargs)
 hnn_ivp = integrate_model(hnn_ode_model, t_span, y0_u, **kwargs)
@@ -314,6 +314,71 @@ for _ in range(1):
 
     # fig.savefig('{}/pend-single-learnt-fun-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
 
+
+#%%
+# plot for the paper
+fig = plt.figure(figsize=(16, 3.2), dpi=DPI)
+plt.subplot(1, 5, 1)
+
+x, y, t = get_trajectory(t_span=[0, 28], noise_std=0.0, y0=y0, u=u0)
+
+plt.plot(base_ivp['y'][0,:],base_ivp['y'][1,:], label='Baseline', color='r', linewidth=LINE_WIDTH)
+plt.plot(x,y, label='Ground Truth', color='k')
+
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Trajectories", pad=10)
+plt.xlim(-5, 3.6)
+plt.ylim(-3.6, 5)
+plt.legend(fontsize=8)
+
+plt.subplot(1, 5, 2)
+
+plt.plot(hnn_ivp['y'][0,:],hnn_ivp['y'][1,:], label='Unstructured Symplectic ODE-Net', color='b', linewidth=LINE_WIDTH)
+plt.plot(hnn_struct_ivp['y'][0,:],hnn_struct_ivp['y'][1,:], label='Symplectic ODE-Net', color='r', linewidth=LINE_WIDTH)
+plt.plot(x,y, label='Ground Truth', color='k')
+
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Trajectories", pad=10)
+plt.xlim(-5, 3.6)
+plt.ylim(-3.6, 5)
+plt.legend(fontsize=8)
+
+plt.subplot(1, 5, 3)
+
+plt.plot(q, g_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $g_{\theta_3}(q)$', color='r')
+plt.plot(q, np.ones_like(q), label='Ground Truth', color='k')
+plt.xlabel("$q$", fontsize=14)
+# plt.ylabel("$g(q)$", rotation=0, fontsize=14)
+plt.title("$g(q)$", pad=10, fontsize=14)
+plt.xlim(-5, 5)
+plt.ylim(0, 4)
+plt.legend(fontsize=8)
+
+M_q_inv = hnn_ode_struct_model.M_net(q_tensor)
+plt.subplot(1, 5, 4)
+plt.plot(q, M_q_inv.detach().cpu().numpy(), label=r'Symplectic ODE-Net $M^{-1}_{\theta_1}(q)$', color='r')
+plt.plot(q, 3 * np.ones_like(q), label='Ground Truth', color='k')
+plt.xlabel("$q$", fontsize=14)
+# plt.ylabel("$M^{-1}(q)$", rotation=0, fontsize=14)
+plt.title("$M^{-1}(q)$", pad=10, fontsize=14)
+plt.xlim(-5, 5)
+plt.ylim(0, 4)
+plt.legend(fontsize=8)
+
+V_q = hnn_ode_struct_model.V_net(q_tensor)
+plt.subplot(1, 5, 5)
+plt.plot(q, V_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $V_{\theta_2}(q)$', color='r')
+plt.plot(q, 5.-5. * np.cos(q), label='Ground Truth', color='k')
+plt.xlabel("$q$", fontsize=14)
+# plt.ylabel("$V(q)$", rotation=0, fontsize=14)
+plt.title("$V(q)$", pad=10, fontsize=14)
+plt.xlim(-5, 5)
+plt.ylim(-8, 15)
+plt.legend(fontsize=8)
+plt.tight_layout()
+# fig.savefig('{}/fig-single-pend.{}'.format(args.fig_dir, FORMAT))
 
 #%%
 # vanilla control
