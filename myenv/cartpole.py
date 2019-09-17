@@ -150,8 +150,8 @@ class CartPoleEnv(gym.Env):
         return np.array([x, np.cos(theta), np.sin(theta), x_dot, theta_dot])
     
     def reset(self):
-        x = self.np_random.uniform(low=-0.05, high=0.05)
-        x_dot = self.np_random.uniform(low=-0.05, high=0.05)
+        x = self.np_random.uniform(low=-1.0, high=1.0)
+        x_dot = self.np_random.uniform(low=-0.5, high=0.5)
         theta = self.np_random.uniform(low=-3.14, high=3.14)
         theta_dot = self.np_random.uniform(low=-3, high=3)
         self.state = np.array([x, x_dot, theta, theta_dot], dtype=np.float32)
