@@ -333,7 +333,44 @@ for _ in range(1):
 
 
 
+#%%
+# plot for the paper
+fig = plt.figure(figsize=(9.6, 3.2), dpi=DPI)
+plt.subplot(1, 3, 1)
 
+g_q = hnn_ode_struct_model.g_net(cos_q_sin_q)
+plt.plot(q, g_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $g_{\theta_3}(q)$', color='r')
+plt.plot(q, np.ones_like(q), label='Ground Truth', color='k')
+plt.xlabel("$q$", fontsize=14)
+# plt.ylabel("$g(q)$", rotation=0, fontsize=14)
+plt.title("$g(q)$", pad=10, fontsize=14)
+plt.xlim(-5, 5)
+plt.ylim(0, 4)
+plt.legend(fontsize=8)
+
+M_q_inv = hnn_ode_struct_model.M_net(cos_q_sin_q)
+plt.subplot(1, 3, 2)
+plt.plot(q, M_q_inv.detach().cpu().numpy(), label=r'Symplectic ODE-Net $M^{-1}_{\theta_1}(q)$', color='r')
+plt.plot(q, 3 * np.ones_like(q), label='Ground Truth', color='k')
+plt.xlabel("$q$", fontsize=14)
+# plt.ylabel("$M^{-1}(q)$", rotation=0, fontsize=14)
+plt.title("$M^{-1}(q)$", pad=10, fontsize=14)
+plt.xlim(-5, 5)
+plt.ylim(0, 4)
+plt.legend(fontsize=8)
+
+V_q = hnn_ode_struct_model.V_net(cos_q_sin_q)
+plt.subplot(1, 3, 3)
+plt.plot(q, V_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $V_{\theta_2}(q)$', color='r')
+plt.plot(q, 5.-5. * np.cos(q), label='Ground Truth', color='k')
+plt.xlabel("$q$", fontsize=14)
+# plt.ylabel("$V(q)$", rotation=0, fontsize=14)
+plt.title("$V(q)$", pad=10, fontsize=14)
+plt.xlim(-5, 5)
+plt.ylim(-15, 25)
+plt.legend(fontsize=8)
+plt.tight_layout()
+# fig.savefig('{}/fig-single-embed.{}'.format(args.fig_dir, FORMAT))
 
 #%%
 # comapring the estimated p and the true p
@@ -388,7 +425,7 @@ plt.plot(t_linspace_true, H_true.detach().cpu().numpy())
 #%%
 # vanilla control
 # time info for simualtion
-time_step = 100 ; n_eval = 100
+time_step = 200 ; n_eval = 200
 t_span = [0,time_step*0.05]
 t_eval = torch.linspace(t_span[0], t_span[1], n_eval)
 # t_linspace_true = np.linspace(t_span[0], time_step, time_step)*0.05
@@ -417,6 +454,7 @@ for i in range(len(t_eval)-1):
     cos_q_sin_q, q_dot, _ = torch.split(y, [2, 1, 1], dim=1)
     cos_q, sin_q = torch.chunk(cos_q_sin_q, 2, dim=1)
     V_q = hnn_ode_struct_model.V_net(cos_q_sin_q)
+    g_q = hnn_ode_struct_model.g_net(cos_q_sin_q)
     dV = torch.autograd.grad(V_q, cos_q_sin_q)[0]
     dVdcos_q, dVdsin_q= torch.chunk(dV, 2, dim=1)
     dV_q = - dVdcos_q * sin_q + dVdsin_q * cos_q
@@ -425,7 +463,7 @@ for i in range(len(t_eval)-1):
 
     # u = (dV_q - k_p * (cos_q - 1) - k_p * (sin_q) - k_d * q_dot)
     # u = M_inv * (dV_q - k_p * q - k_d * q_dot)
-    u = (2*dV_q  - k_d * q_dot)
+    u = 1/g_q * (2*dV_q  - k_d * q_dot)
 
     # use openai simulator
     u = u.detach().cpu().numpy()
@@ -445,22 +483,30 @@ y_traj = torch.stack(y_traj).view(-1, 4).detach().cpu().numpy()
 
 #%%
 # plot control result
-fig = plt.figure(figsize=[10, 10], dpi=DPI)
-plt.subplot(4, 1, 1)
+fig = plt.figure(figsize=[14, 3.2], dpi=DPI)
+plt.subplot(1, 4, 1)
 plt.plot(t_eval.numpy(), y_traj[:, 0])
 plt.ylabel('$cos(q)$', fontsize=14)
+plt.xlabel('$t$', fontsize=14)
+plt.ylim([-1.1, 1.1])
 
-plt.subplot(4, 1, 2)
+plt.subplot(1, 4, 2)
 plt.plot(t_eval.numpy(), y_traj[:, 1])
 plt.ylabel('$sin(q)$', fontsize=14)
+plt.xlabel('$t$', fontsize=14)
+plt.ylim([-1.1, 1.1])
 
-plt.subplot(4, 1, 3)
+plt.subplot(1, 4, 3)
 plt.plot(t_eval.numpy(), y_traj[:, 2])
 plt.ylabel('$\dot{q}$', fontsize=14)
+plt.xlabel('$t$', fontsize=14)
+plt.ylim([-3.1, 3.1])
 
-plt.subplot(4, 1, 4)
-plt.plot(t_eval.numpy(), y_traj[:, 2])
+plt.subplot(1, 4, 4)
+plt.plot(t_eval.numpy(), y_traj[:, 3])
 plt.ylabel('$u$', fontsize=14)
+plt.xlabel('$t$', fontsize=14)
+plt.ylim([-8.1, 8.1])
 
 plt.tight_layout() ; plt.show()
 fig.savefig('{}/pend-single-embed-ctrl-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
