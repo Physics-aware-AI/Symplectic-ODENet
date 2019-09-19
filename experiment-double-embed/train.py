@@ -99,8 +99,8 @@ def train(args):
     # us = [0.0, -2.0, 2.0, -4.0, 4.0, -6.0, 6.0]
     # us = np.linspace(-2.0, 2.0, 20)
     # us = [0.0, 1.0]
-    data = get_dataset(seed=args.seed, timesteps=30,
-                save_dir=args.save_dir, us=us, samples=400) #us=np.linspace(-2.0, 2.0, 20)
+    data = get_dataset(seed=args.seed, timesteps=20,
+                save_dir=args.save_dir, us=us, samples=600) #us=np.linspace(-2.0, 2.0, 20)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 

@@ -203,8 +203,8 @@ true_ivp = np.concatenate((true_ivp, u0 * np.zeros((1, time_step))), axis=0)
 
 #%%
 # comparing true trajectory and the estimated trajectory
-plt.plot(t_linspace_model, base_ivp.y[5,:], 'b-')
-plt.plot(t_linspace_model, hnn_ivp.y[5,:], 'y-')
+plt.plot(t_linspace_model, base_ivp.y[0,:], 'b-')
+plt.plot(t_linspace_model, hnn_ivp.y[0,:], 'y-')
 plt.plot(t_linspace_model, hnn_struct_ivp.y[0,:], 'r-')
 plt.plot(t_linspace_true, true_ivp[0,:], 'g')
 

@@ -22,7 +22,7 @@ def dynamics_fn(t, coords, u=0):
     S = np.concatenate([dpdt, -dqdt + u], axis=-1)
     return S
 
-def get_trajectory(t_span=[0, 1.5], timescale=20, radius=None, y0=None, noise_std=0.1, u=0.0, rad=False, **kwargs):
+def get_trajectory(t_span=[0, 1.0], timescale=20, radius=None, y0=None, noise_std=0.1, u=0.0, rad=False, **kwargs):
     t_eval = np.linspace(t_span[0], t_span[1], int(timescale*(t_span[1]-t_span[0])))
     
     # get initial state

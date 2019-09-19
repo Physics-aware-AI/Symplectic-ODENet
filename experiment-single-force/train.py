@@ -85,7 +85,7 @@ def train(args):
     us = [-2.0, -1.0, 0.0, 1.0, 2.0]
     # us = [0.0]
     data = get_dataset(seed=args.seed,
-                    save_dir=args.save_dir, rad=args.rad, us=us, samples=200) #us=np.linspace(-2.0, 2.0, 20)
+                    save_dir=args.save_dir, rad=args.rad, us=us, samples=300) #us=np.linspace(-2.0, 2.0, 20)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
