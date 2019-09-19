@@ -127,6 +127,7 @@ data = get_dataset(seed=args.seed, timesteps=30,
 train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
 test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
+
 #%% [markdown]
 # ## Integrate along vector fields
 
@@ -179,7 +180,7 @@ true_ivp = np.concatenate((true_ivp, u0 * np.zeros((1, time_step))), axis=0)
 #%%
 # comparing true trajectory and the estimated trajectory
 for _ in range(1):
-    fig = plt.figure(figsize=(4, 4), dpi=DPI)
+    fig = plt.figure(figsize=(10, 10), dpi=DPI)
     plt.subplot(5, 1, 1)
     plt.plot(t_linspace_model, base_ivp.y[0,:], 'b-')
     plt.plot(t_linspace_model, hnn_ivp.y[0,:], 'y-')
@@ -370,38 +371,34 @@ for i in range(len(t_eval)-1):
     # y = y_step[-1,:,:]
     y_traj.append(y)
 
-
-#%%
 y_traj = torch.stack(y_traj).view(-1, 6).detach().cpu().numpy()
 
-
+#%%
 # plot vanilla control result
-fig = plt.figure(figsize=[10, 10], dpi=DPI)
-plt.subplot(7, 1, 1)
+fig = plt.figure(figsize=[16, 3.2], dpi=DPI)
+plt.subplot(1, 5, 1)
 plt.plot(t_eval.numpy(), y_traj[:, 0])
-plt.ylabel("$x$", fontsize=14)
+plt.title("$x$", fontsize=14)
 
-plt.subplot(7, 1, 2)
-plt.plot(t_eval.numpy(), y_traj[:, 1])
-plt.ylabel("$cos(q)$", fontsize=14)
+plt.subplot(1, 5, 2)
+plt.plot(t_eval.numpy(), y_traj[:, 1], label="$cos(q)$")
+plt.plot(t_eval.numpy(), y_traj[:, 2], label="$sin(q)$")
+plt.title("$q$", fontsize=14)
+plt.legend(fontsize=10)
 
-plt.subplot(7, 1, 3)
-plt.plot(t_eval.numpy(), y_traj[:, 2])
-plt.ylabel("$sin(q)$", fontsize=14)
-
-plt.subplot(7, 1, 4)
+plt.subplot(1, 5, 3)
 plt.plot(t_eval.numpy(), y_traj[:, 3])
-plt.ylabel("$\dot{x}$", fontsize=14)
+plt.title("$\dot{x}$", fontsize=14)
 
-plt.subplot(7, 1, 5)
+plt.subplot(1, 5, 4)
 plt.plot(t_eval.numpy(), y_traj[:, 4])
-plt.ylabel("$\dot{q}$", fontsize=14)
+plt.title("$\dot{q}$", fontsize=14)
 
-plt.subplot(7, 1, 6)
+plt.subplot(1, 5, 5)
 plt.plot(t_eval.numpy(), y_traj[:, 5])
-plt.ylabel("$u$", fontsize=14)
+plt.title("$u$", fontsize=14)
 
-# fig.savefig('{}/cartpole-pd-ctrl-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
+fig.savefig('{}/fig-cartpole-ctrl.{}'.format(args.fig_dir, FORMAT))
 
 
 #%%
