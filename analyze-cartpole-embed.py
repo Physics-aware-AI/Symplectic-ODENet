@@ -151,7 +151,7 @@ t_linspace_model = np.linspace(t_span[0], t_span[1], n_eval)
 
 # initial condition
 q0 = 1.57
-x0 = 1.0
+x0 = 0.0
 u0 = 0.0
 
 y0_u = np.asarray([x0, np.cos(q0), np.sin(q0), 0.0, 0.0, u0])
