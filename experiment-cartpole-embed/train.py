@@ -19,7 +19,7 @@ def get_args():
     parser.add_argument('--num_cart', default=1, type=int, help='number of Cartesian coordinates')
     parser.add_argument('--learn_rate', default=1e-4, type=float, help='learning rate')
     parser.add_argument('--nonlinearity', default='tanh', type=str, help='neural net nonlinearity')
-    parser.add_argument('--total_steps', default=2000, type=int, help='number of gradient steps')
+    parser.add_argument('--total_steps', default=1000, type=int, help='number of gradient steps')
     parser.add_argument('--print_every', default=200, type=int, help='number of gradient steps between prints')
     parser.add_argument('--name', default='pend', type=str, help='only one option right now')
     parser.add_argument('--baseline', dest='baseline', action='store_true', help='run baseline or experiment?')
@@ -91,8 +91,8 @@ def train(args):
 
     # arrange data
     # us = [-3.0, -2.0, -1.0, 0.0, 1.0, 2.0, 3.0]
-    # us = [0.0, -1.0, 1.0, -2.0, 2.0]
-    us = [-2.0, -1.0, 0.0, 1.0, 2.0]
+    us = [0.0, -1.0, 1.0, -2.0, 2.0]
+    # us = [-2.0, -1.0, 0.0, 1.0, 2.0]
     # us = [0.0, -2.0, 2.0, -4.0, 4.0, -6.0, 6.0]
     # us = np.linspace(-2.0, 2.0, 20)
     # us = [0.0]
