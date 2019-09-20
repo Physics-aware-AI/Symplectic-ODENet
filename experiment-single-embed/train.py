@@ -98,7 +98,7 @@ def train(args):
     # us = np.linspace(-2.0, 2.0, 20)
     # us = [0.0]
     data = get_dataset(seed=args.seed, timesteps=20,
-                save_dir=args.save_dir, us=us, samples=300) #us=np.linspace(-2.0, 2.0, 20)
+                save_dir=args.save_dir, us=us, samples=32) #us=np.linspace(-2.0, 2.0, 20)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
@@ -140,12 +140,6 @@ def train(args):
         if args.verbose and step % args.print_every == 0:
             print("step {}, train_loss {:.4e}, test_loss {:.4e}".format(step, train_loss.item(), test_loss.item()))
 
-    train_x, t_eval = arrange_data(data['x'], data['t'], num_points=20)
-    test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=20)
-
-    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
-    test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
-    t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
 
     # calculate loss mean and std for each traj.
     train_x, t_eval = data['x'], data['t']
@@ -166,19 +160,17 @@ def train(args):
         test_loss.append((test_x[i,:,:,:] - test_x_hat)**2)
 
     train_loss = torch.cat(train_loss, dim=1)
-    train_dist = torch.sqrt(torch.sum(train_loss, dim=2))
-    mean_train_dist = torch.sum(train_dist, dim=0) / train_dist.shape[0]
+    train_loss_per_traj = torch.sum(train_loss, dim=(0,2))
 
     test_loss = torch.cat(test_loss, dim=1)
-    test_dist = torch.sqrt(torch.sum(test_loss, dim=2))
-    mean_test_dist = torch.sum(test_dist, dim=0) / test_dist.shape[0]
+    test_loss_per_traj = torch.sum(test_loss, dim=(0,2))
 
     print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
-    .format(mean_train_dist.mean().item(), mean_train_dist.std().item(),
-            mean_test_dist.mean().item(), mean_test_dist.std().item()))
+    .format(train_loss_per_traj.mean().item(), train_loss_per_traj.std().item(),
+            test_loss_per_traj.mean().item(), test_loss_per_traj.std().item()))
 
-    stats['traj_train_loss'] = mean_train_dist.detach().cpu().numpy()
-    stats['traj_test_loss'] = mean_test_dist.detach().cpu().numpy()
+    stats['traj_train_loss'] = train_loss_per_traj.detach().cpu().numpy()
+    stats['traj_test_loss'] = test_loss_per_traj.detach().cpu().numpy()
     return model, stats
 
 
