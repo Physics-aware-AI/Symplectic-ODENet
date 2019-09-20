@@ -127,6 +127,32 @@ data = get_dataset(seed=args.seed, timesteps=30,
 train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
 test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
+#%%
+
+t = 0
+x = data['x'][0,t,:,0] ; cos_q = data['x'][0,t,:,1]
+sin_q = data['x'][0,t,:,2] ; x_dot = data['x'][0,t,:,3]
+q_dot = data['x'][0,t,:,4]
+
+i = 0
+# x = data['x'][0,:,i,0] ; cos_q = data['x'][0,:,i,1]
+# sin_q = data['x'][0,:,i,2] ; x_dot = data['x'][0,:,i,3]
+# q_dot = data['x'][0,:,i,4]
+for _ in range(1):
+    fig = plt.figure(figsize=[12,3], dpi=DPI)
+    plt.subplot(1, 3, 1)
+    plt.scatter(x, x_dot)
+
+    plt.subplot(1, 3, 2)
+    plt.scatter(np.arctan2(sin_q, cos_q), q_dot)
+
+for _ in range(0):
+    fig = plt.figure(figsize=[12,3], dpi=DPI)
+    plt.subplot(1, 3, 1)
+    plt.plot(x)
+
+    plt.subplot(1, 3, 2)
+    plt.plot(np.arctan2(sin_q, cos_q))
 
 #%% [markdown]
 # ## Integrate along vector fields
@@ -150,8 +176,8 @@ t_linspace_true = np.linspace(t_span[0], time_step, time_step)*0.02
 t_linspace_model = np.linspace(t_span[0], t_span[1], n_eval)
 
 # initial condition
-q0 = 1.57
-x0 = 0.0
+q0 = 1.00
+x0 = 1.0
 u0 = 0.0
 
 y0_u = np.asarray([x0, np.cos(q0), np.sin(q0), 0.0, 0.0, u0])
