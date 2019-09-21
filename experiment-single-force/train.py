@@ -69,7 +69,7 @@ def train(args):
         model = HNN_structure_forcing(args.input_dim, H_net=H_net, g_net=g_net, device=device, baseline=False)
     elif args.structure == True and args.baseline ==False:
         # M_net = MLP(1, args.hidden_dim, 1).to(device)
-        M_net = PSD(int(args.input_dim/2), 300, int(args.input_dim/2))
+        M_net = MLP(int(args.input_dim/2), 300, int(args.input_dim/2))
         V_net = MLP(int(args.input_dim/2), 50, 1).to(device)
         g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2)).to(device)
         model = HNN_structure_forcing(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=False, structure=True).to(device)
