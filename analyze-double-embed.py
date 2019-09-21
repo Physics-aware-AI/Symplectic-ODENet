@@ -127,6 +127,7 @@ data = get_dataset(seed=args.seed, timesteps=50,
 pred_x, pred_t_eval = data['x'], data['t']
 
 #%%
+from torchdiffeq import odeint
 def get_pred_loss(pred_x, pred_t_eval, model):
     pred_x = torch.tensor(pred_x, requires_grad=True, dtype=torch.float32).to(device) 
     pred_t_eval = torch.tensor(pred_t_eval, requires_grad=True, dtype=torch.float32).to(device)

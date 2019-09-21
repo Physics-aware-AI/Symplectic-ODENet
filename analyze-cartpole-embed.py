@@ -120,6 +120,54 @@ print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss
         np.mean(hnn_ode_struct_stats['traj_test_loss']), np.std(hnn_ode_struct_stats['traj_test_loss'])))
 
 #%%
+# get prediction dataset
+# us = [-2.0, -1.0, 0.0, 1.0, 2.0]
+us = [0.0]
+data = get_dataset(seed=args.seed, timesteps=50,
+            save_dir=args.save_dir, us=us, samples=32) #us=np.linspace(-2.0, 2.0, 20)
+
+pred_x, pred_t_eval = data['x'], data['t']
+
+#%%
+from torchdiffeq import odeint
+def get_pred_loss(pred_x, pred_t_eval, model):
+    pred_x = torch.tensor(pred_x, requires_grad=True, dtype=torch.float32).to(device) 
+    pred_t_eval = torch.tensor(pred_t_eval, requires_grad=True, dtype=torch.float32).to(device)
+
+    pred_loss = []
+    for i in range(pred_x.shape[0]):
+        pred_x_hat = odeint(model, pred_x[i, 0, :, :], pred_t_eval, method='rk4')            
+        pred_loss.append((pred_x[i,:,:,:] - pred_x_hat)**2)
+    
+    pred_loss = torch.cat(pred_loss, dim=1)
+    pred_loss_per_traj = torch.sum(pred_loss, dim=(0, 2))
+
+    return pred_loss_per_traj.detach().cpu().numpy()
+
+naive_pred_loss = get_pred_loss(pred_x, pred_t_eval, naive_ode_model)
+base_pred_loss = get_pred_loss(pred_x, pred_t_eval, base_ode_model)
+hnn_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_model)
+hnn_struct_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_struct_model)
+
+
+#%%
+print('Naive_ode')
+print('Prediction loss {:.4e} +/- {:.4e}'
+.format(np.mean(naive_pred_loss), np.std(naive_pred_loss)))
+print('')
+print('Baseline_ode')
+print('Prediction loss {:.4e} +/- {:.4e}'
+.format(np.mean(base_pred_loss), np.std(base_pred_loss)))
+print('')
+print('HNN_ode')
+print('Prediction loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_pred_loss), np.std(hnn_pred_loss)))
+print('')
+print('HNN_structure_ode')
+print('Prediction loss {:.4e} +/- {:.4e}'
+.format(np.mean(hnn_struct_pred_loss), np.std(hnn_struct_pred_loss)))
+
+#%%
 # check training dataset
 us = [0.0]
 data = get_dataset(seed=args.seed, timesteps=30,
@@ -159,7 +207,6 @@ for _ in range(0):
 
 #%%
 # from torchdiffeq import odeint_adjoint as ode_int 
-from torchdiffeq import odeint
 def integrate_model(model, t_span, y0, **kwargs):
     
     def fun(t, np_x):
@@ -238,52 +285,6 @@ for _ in range(1):
     plt.plot(t_linspace_true, true_ivp[4,:], 'g')
 
 
-#%%
-# get prediction dataset
-# us = [-2.0, -1.0, 0.0, 1.0, 2.0]
-us = [0.0]
-data = get_dataset(seed=args.seed, timesteps=50,
-            save_dir=args.save_dir, us=us, samples=32) #us=np.linspace(-2.0, 2.0, 20)
-
-pred_x, pred_t_eval = data['x'], data['t']
-
-#%%
-def get_pred_loss(pred_x, pred_t_eval, model):
-    pred_x = torch.tensor(pred_x, requires_grad=True, dtype=torch.float32).to(device) 
-    pred_t_eval = torch.tensor(pred_t_eval, requires_grad=True, dtype=torch.float32).to(device)
-
-    pred_loss = []
-    for i in range(pred_x.shape[0]):
-        pred_x_hat = odeint(model, pred_x[i, 0, :, :], pred_t_eval, method='rk4')            
-        pred_loss.append((pred_x[i,:,:,:] - pred_x_hat)**2)
-    
-    pred_loss = torch.cat(pred_loss, dim=1)
-    pred_loss_per_traj = torch.sum(pred_loss, dim=(0, 2))
-
-    return pred_loss_per_traj.detach().cpu().numpy()
-
-naive_pred_loss = get_pred_loss(pred_x, pred_t_eval, naive_ode_model)
-base_pred_loss = get_pred_loss(pred_x, pred_t_eval, base_ode_model)
-hnn_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_model)
-hnn_struct_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_struct_model)
-
-
-#%%
-print('Naive_ode')
-print('Prediction loss {:.4e} +/- {:.4e}'
-.format(np.mean(naive_pred_loss), np.std(naive_pred_loss)))
-print('')
-print('Baseline_ode')
-print('Prediction loss {:.4e} +/- {:.4e}'
-.format(np.mean(base_pred_loss), np.std(base_pred_loss)))
-print('')
-print('HNN_ode')
-print('Prediction loss {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_pred_loss), np.std(hnn_pred_loss)))
-print('')
-print('HNN_structure_ode')
-print('Prediction loss {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_struct_pred_loss), np.std(hnn_struct_pred_loss)))
 
 #%%
 # plot learnt function
