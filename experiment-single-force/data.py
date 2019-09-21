@@ -22,9 +22,10 @@ def dynamics_fn(t, coords, u=0):
     S = np.concatenate([dpdt, -dqdt + u], axis=-1)
     return S
 
-def get_trajectory(t_span=[0, 1.0], timescale=20, radius=None, y0=None, noise_std=0.1, u=0.0, rad=False, **kwargs):
-    t_eval = np.linspace(t_span[0], t_span[1], int(timescale*(t_span[1]-t_span[0])))
-    
+def get_trajectory(timesteps=20, radius=None, y0=None, noise_std=0.1, u=0.0, rad=False, **kwargs):
+    t_eval = np.linspace(1, timesteps, timesteps) * 0.05
+    t_span = [0.05, timesteps*0.05]
+
     # get initial state
     if rad:
         if y0 is None:
@@ -90,7 +91,7 @@ def sample_gym(seed=0, timesteps=60, trials=50, side=28, min_angle=0., max_angle
     tspan = np.arange(timesteps) * 0.05
     return trajs, tspan, gym_settings
 
-def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us=[0], rad=False, **kwargs):
+def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us=[0], rad=False, timesteps=20, **kwargs):
     data = {}
 
     if gym:
@@ -123,7 +124,7 @@ def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us
             xs = []
             np.random.seed(seed)
             for _ in range(samples):
-                q, p, t = get_trajectory(noise_std=0.0, u=u, rad=rad, **kwargs)
+                q, p, t = get_trajectory(noise_std=0.0, u=u, rad=rad, timesteps=timesteps, **kwargs)
                 xs.append(np.stack((q, p, np.ones_like(q)*u), axis=1)) # (45, 3) last dimension is u
             xs_force.append(np.stack(xs, axis=1)) # fit Neural ODE format (45, 50, 3)
             
