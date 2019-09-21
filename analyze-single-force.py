@@ -36,7 +36,7 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 5,
+         'num_points': 4,
          'gpu': 3,
          'solver': 'dopri5',
          'rad': False,
@@ -66,7 +66,7 @@ q_01 = data['x'][0,:,i,0] ; p_01 = data['x'][0,:,i,1]
 q_02 = data['x'][1,:,i,0] ; p_02 = data['x'][1,:,i,1]
 q_03 = data['x'][2,:,i,0] ; p_03 = data['x'][2,:,i,1]
 
-for _ in range(1):
+for _ in range(0):
     fig = plt.figure(figsize=[12,3], dpi=DPI)
     plt.subplot(1, 3, 1)
     plt.plot(q_01)
@@ -167,7 +167,7 @@ print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss
 # get prediction dataset
 # us = [-2.0, -1.0, 0.0, 1.0, 2.0]
 us = [0.0]
-data = get_dataset(seed=args.seed, timesteps=50,
+data = get_dataset(seed=args.seed, timesteps=40,
             save_dir=args.save_dir, us=us, samples=32) #us=np.linspace(-2.0, 2.0, 20)
 
 pred_x, pred_t_eval = data['x'], data['t']
