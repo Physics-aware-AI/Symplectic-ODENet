@@ -38,7 +38,7 @@ def get_args():
          'fig_dir': './figures',
          'num_points': 4,
          'gpu': 3,
-         'solver': 'dopri5',
+         'solver': 'rk4',
          'rad': False,
          'gym': False}
 
@@ -168,7 +168,7 @@ print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss
 # us = [-2.0, -1.0, 0.0, 1.0, 2.0]
 us = [0.0]
 data = get_dataset(seed=args.seed, timesteps=40,
-            save_dir=args.save_dir, us=us, samples=512) #us=np.linspace(-2.0, 2.0, 20)
+            save_dir=args.save_dir, us=us, samples=1024) #us=np.linspace(-2.0, 2.0, 20)
 
 pred_x, pred_t_eval = data['x'], data['t']
 
