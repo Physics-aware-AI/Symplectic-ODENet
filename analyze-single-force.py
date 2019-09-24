@@ -16,7 +16,7 @@ from hnn import HNN, HNN_structure, HNN_structure_forcing
 from utils import L2_loss, from_pickle
 
 #%%
-DPI = 300
+DPI = 600
 FORMAT = 'png'
 LINE_SEGMENTS = 10
 ARROW_SCALE = 40
@@ -36,9 +36,9 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 4,
+         'num_points': 5,
          'gpu': 3,
-         'solver': 'rk4',
+         'solver': 'dopri5',
          'rad': False,
          'gym': False}
 
@@ -168,7 +168,7 @@ print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss
 # us = [-2.0, -1.0, 0.0, 1.0, 2.0]
 us = [0.0]
 data = get_dataset(seed=args.seed, timesteps=40,
-            save_dir=args.save_dir, us=us, samples=2048) #us=np.linspace(-2.0, 2.0, 20)
+            save_dir=args.save_dir, us=us, samples=512) #us=np.linspace(-2.0, 2.0, 20)
 
 pred_x, pred_t_eval = data['x'], data['t']
 
@@ -221,7 +221,7 @@ def integrate_model(model, t_span, y0, **kwargs):
 
     return solve_ivp(fun=fun, t_span=t_span, y0=y0, **kwargs)
 
-t_span = [0,28]
+t_span = [0,10]
 y0 = np.asarray([1.8, 0])
 u0 = 0.0
 y0_u = np.asarray([1.8, 0, u0])
@@ -260,7 +260,7 @@ for _ in range(1):
     fig = plt.figure(figsize=(16, 3.2), dpi=DPI)
 
     plt.subplot(1, 4, 1)
-    x, y, t = get_trajectory(t_span=[0, 4], noise_std=0.0, y0=y0, radius=2.1, u=u0)
+    x, y, t = get_trajectory(timesteps=40, noise_std=0.0, y0=y0, radius=2.1, u=u0)
     N = len(x)
     point_colors = [(i/N, 0, 1-i/N) for i in range(N)]
     plt.scatter(x,y, s=14, label='data', c=point_colors)
@@ -360,68 +360,88 @@ for _ in range(1):
 
 #%%
 # plot for the paper
-fig = plt.figure(figsize=(16, 3.2), dpi=DPI)
-plt.subplot(1, 5, 1)
+fig = plt.figure(figsize=(9.6, 3.2), dpi=DPI)
+plt.subplot(1, 3, 1)
 
-x, y, t = get_trajectory(t_span=[0, 28], noise_std=0.0, y0=y0, u=u0)
+x, y, t = get_trajectory(timesteps=200, noise_std=0.0, y0=y0, u=u0)
 
-plt.plot(base_ivp['y'][0,:],base_ivp['y'][1,:], label='Baseline', color='r', linewidth=LINE_WIDTH)
-plt.plot(x,y, label='Ground Truth', color='k')
-
-plt.xlabel("$q$", fontsize=14)
-plt.ylabel("$p$", rotation=0, fontsize=14)
-plt.title("Trajectories", pad=10)
-plt.xlim(-5, 3.6)
-plt.ylim(-3.6, 5)
-plt.legend(fontsize=8)
-
-plt.subplot(1, 5, 2)
-
-plt.plot(hnn_ivp['y'][0,:],hnn_ivp['y'][1,:], label='Unstructured Symplectic ODE-Net', color='b', linewidth=LINE_WIDTH)
-plt.plot(hnn_struct_ivp['y'][0,:],hnn_struct_ivp['y'][1,:], label='Symplectic ODE-Net', color='r', linewidth=LINE_WIDTH)
-plt.plot(x,y, label='Ground Truth', color='k')
+plt.plot(x,y, label='Ground Truth', color='k', linewidth=1)
+plt.plot(base_ivp['y'][0,:],base_ivp['y'][1,:], 'y', label='Naive Baseline', linewidth=1.3)
 
 plt.xlabel("$q$", fontsize=14)
 plt.ylabel("$p$", rotation=0, fontsize=14)
-plt.title("Trajectories", pad=10)
-plt.xlim(-5, 3.6)
-plt.ylim(-3.6, 5)
-plt.legend(fontsize=8)
+plt.title("Trajectory Prediction", pad=10)
+plt.xlim(-3, 3)
+plt.ylim(-2.4, 3.6)
+# plt.gca().set_aspect('equal', adjustable='box')
+plt.legend(fontsize=10)
 
-plt.subplot(1, 5, 3)
+plt.subplot(1, 3, 2)
 
-plt.plot(q, g_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $g_{\theta_3}(q)$', color='r')
-plt.plot(q, np.ones_like(q), label='Ground Truth', color='k')
+plt.plot(x,y, label='Ground Truth', color='k', linewidth=1)
+plt.plot(hnn_ivp['y'][0,:],hnn_ivp['y'][1,:], 'g', label='Unstructured SymODEN', linewidth=1.3)
+
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Trajectory Prediction", pad=10)
+plt.xlim(-3, 3)
+plt.ylim(-2.4, 3.6)
+# plt.gca().set_aspect('equal', adjustable='box')
+plt.legend(fontsize=10)
+
+plt.subplot(1, 3, 3)
+
+plt.plot(x,y, label='Ground Truth', color='k', linewidth=1)
+plt.plot(hnn_struct_ivp['y'][0,:],hnn_struct_ivp['y'][1,:], 'b', label='SymODEN', linewidth=1.3)
+
+plt.xlabel("$q$", fontsize=14)
+plt.ylabel("$p$", rotation=0, fontsize=14)
+plt.title("Trajectory Prediction", pad=10)
+plt.xlim(-3, 3)
+plt.ylim(-2.4, 3.6)
+# plt.gca().set_aspect('equal', adjustable='box')
+plt.legend(fontsize=10)
+
+plt.tight_layout()
+fig.savefig('{}/fig-single-traj.{}'.format(args.fig_dir, FORMAT))
+
+#%%
+fig = plt.figure(figsize=(9.6, 2.5), dpi=DPI)
+
+plt.subplot(1, 3, 1)
+
+plt.plot(q, np.ones_like(q), label='Ground Truth', color='k', linewidth=2)
+plt.plot(q, g_q.detach().cpu().numpy(), 'b--', linewidth=3, label=r'SymODEN $g_{\theta_3}(q)$')
 plt.xlabel("$q$", fontsize=14)
 # plt.ylabel("$g(q)$", rotation=0, fontsize=14)
 plt.title("$g(q)$", pad=10, fontsize=14)
 plt.xlim(-5, 5)
 plt.ylim(0, 4)
-plt.legend(fontsize=8)
+plt.legend(fontsize=10)
 
 M_q_inv = hnn_ode_struct_model.M_net(q_tensor)
-plt.subplot(1, 5, 4)
-plt.plot(q, M_q_inv.detach().cpu().numpy(), label=r'Symplectic ODE-Net $M^{-1}_{\theta_1}(q)$', color='r')
-plt.plot(q, 3 * np.ones_like(q), label='Ground Truth', color='k')
+plt.subplot(1, 3, 2)
+plt.plot(q, 3 * np.ones_like(q), label='Ground Truth', color='k', linewidth=2)
+plt.plot(q, M_q_inv.detach().cpu().numpy(), 'b--', linewidth=3, label=r'SymODEN $M^{-1}_{\theta_1}(q)$')
 plt.xlabel("$q$", fontsize=14)
 # plt.ylabel("$M^{-1}(q)$", rotation=0, fontsize=14)
 plt.title("$M^{-1}(q)$", pad=10, fontsize=14)
 plt.xlim(-5, 5)
 plt.ylim(0, 4)
-plt.legend(fontsize=8)
+plt.legend(fontsize=10)
 
 V_q = hnn_ode_struct_model.V_net(q_tensor)
-plt.subplot(1, 5, 5)
-plt.plot(q, V_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $V_{\theta_2}(q)$', color='r')
-plt.plot(q, 5.-5. * np.cos(q), label='Ground Truth', color='k')
+plt.subplot(1, 3, 3)
+plt.plot(q, 5.-5. * np.cos(q), label='Ground Truth', color='k', linewidth=2)
+plt.plot(q, V_q.detach().cpu().numpy(), 'b--', linewidth=3, label=r'SymODEN $V_{\theta_2}(q)$')
 plt.xlabel("$q$", fontsize=14)
 # plt.ylabel("$V(q)$", rotation=0, fontsize=14)
 plt.title("$V(q)$", pad=10, fontsize=14)
 plt.xlim(-5, 5)
-plt.ylim(-8, 15)
-plt.legend(fontsize=8)
+plt.ylim(-6, 21)
+plt.legend(fontsize=10)
 plt.tight_layout()
-# fig.savefig('{}/fig-single-pend.{}'.format(args.fig_dir, FORMAT))
+fig.savefig('{}/fig-single-pend.{}'.format(args.fig_dir, FORMAT))
 
 #%%
 # vanilla control
