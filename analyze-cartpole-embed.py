@@ -36,9 +36,9 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 4,
+         'num_points': 5,
          'gpu': 2,
-         'solver': 'rk4'}
+         'solver': 'dopri5'}
 
 class ObjectView(object):
     def __init__(self, d): self.__dict__ = d
@@ -124,7 +124,7 @@ print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss
 # us = [-2.0, -1.0, 0.0, 1.0, 2.0]
 us = [0.0]
 data = get_dataset(seed=args.seed, timesteps=40,
-            save_dir=args.save_dir, us=us, samples=1024) #us=np.linspace(-2.0, 2.0, 20)
+            save_dir=args.save_dir, us=us, samples=64) #us=np.linspace(-2.0, 2.0, 20)
 
 pred_x, pred_t_eval = data['x'], data['t']
 
@@ -383,7 +383,7 @@ plt.plot(hnn_struct_ivp.y.T[:, 3], 'r')
 #%%
 # vanilla control
 # time info for simualtion
-time_step = 100 ; n_eval = 100
+time_step = 400 ; n_eval = 400
 t_span = [0,time_step*0.02]
 t_linspace_true = np.linspace(t_span[0], time_step, time_step)*0.02
 t_linspace_model = np.linspace(t_span[0], t_span[1], n_eval)
@@ -434,8 +434,9 @@ for i in range(len(t_eval)-1):
     # # u = torch.sum(g_q/norm * (2*torch.cat((dVdx, dV_q), dim=1) - 3*dHdp), dim=1).view(1, 1)
     # u = -20*u_es - u_di
 
-    k_p = 60.0 ; k_d = 5.0
-    u = + k_p * sin_q + k_p * (cos_q - 1) + k_d * x_dot_q_dot[:, 1] # - 6 * x_dot_q_dot[:, 0] # * torch.sum(x_dot_q_dot[:, 0], dim=1)
+    k_p = 100.0 ; k_d = 2.0
+    # u = + k_p * sin_q + k_p * (cos_q - 1) + k_d * x_dot_q_dot[:, 1] # - 6 * x_dot_q_dot[:, 0] # * torch.sum(x_dot_q_dot[:, 0], dim=1)
+    u = 70 * sin_q + 0.9 * x_dot_q_dot[:, 1]
 
     u = u.detach().cpu().numpy()
     obs, _, _, _ = env.step(u)
@@ -450,30 +451,36 @@ y_traj = torch.stack(y_traj).view(-1, 6).detach().cpu().numpy()
 
 #%%
 # plot vanilla control result
-fig = plt.figure(figsize=[16, 3.2], dpi=DPI)
+fig = plt.figure(figsize=[16, 2.2], dpi=DPI)
 plt.subplot(1, 5, 1)
-plt.plot(t_eval.numpy(), y_traj[:, 0])
+plt.plot(t_eval.numpy(), y_traj[:, 0], color='k', linewidth=LINE_WIDTH)
 plt.title("$x$", fontsize=14)
+plt.xlabel('t')
 
 plt.subplot(1, 5, 2)
-plt.plot(t_eval.numpy(), y_traj[:, 1], label="$cos(q)$")
-plt.plot(t_eval.numpy(), y_traj[:, 2], label="$sin(q)$")
+plt.plot(t_eval.numpy(), y_traj[:, 1], 'k--', label="$cos(q)$", linewidth=LINE_WIDTH)
+plt.plot(t_eval.numpy(), y_traj[:, 2], 'k-', label="$sin(q)$", linewidth=LINE_WIDTH)
 plt.title("$q$", fontsize=14)
-plt.legend(fontsize=10)
+plt.xlabel('t')
+plt.legend(fontsize=12)
 
 plt.subplot(1, 5, 3)
-plt.plot(t_eval.numpy(), y_traj[:, 3])
+plt.plot(t_eval.numpy(), y_traj[:, 3], color='k', linewidth=LINE_WIDTH)
 plt.title("$\dot{x}$", fontsize=14)
+plt.xlabel('t')
 
 plt.subplot(1, 5, 4)
-plt.plot(t_eval.numpy(), y_traj[:, 4])
+plt.plot(t_eval.numpy(), y_traj[:, 4], color='k', linewidth=LINE_WIDTH)
 plt.title("$\dot{q}$", fontsize=14)
+plt.xlabel('t')
 
 plt.subplot(1, 5, 5)
-plt.plot(t_eval.numpy(), y_traj[:, 5])
+plt.plot(t_eval.numpy(), y_traj[:, 5], color='k', linewidth=LINE_WIDTH)
 plt.title("$u$", fontsize=14)
+plt.xlabel('t')
 
-fig.savefig('{}/fig-cartpole-ctrl.{}'.format(args.fig_dir, FORMAT))
+plt.tight_layout()
+# fig.savefig('{}/fig-cartpole-ctrl.{}'.format(args.fig_dir, FORMAT))
 
 
 #%%
