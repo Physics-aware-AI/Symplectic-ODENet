@@ -16,7 +16,7 @@ from hnn import HNN, HNN_structure, HNN_structure_embed
 from utils import L2_loss, from_pickle
 
 #%%
-DPI = 300
+DPI = 600
 FORMAT = 'png'
 LINE_SEGMENTS = 10
 ARROW_SCALE = 40
@@ -36,9 +36,9 @@ def get_args():
          'seed': 0,
          'save_dir': './{}'.format(EXPERIMENT_DIR),
          'fig_dir': './figures',
-         'num_points': 4,
+         'num_points': 5,
          'gpu': 3,
-         'solver': 'rk4'}
+         'solver': 'dopri5'}
 
 class ObjectView(object):
     def __init__(self, d): self.__dict__ = d
@@ -384,42 +384,43 @@ for _ in range(1):
 
 #%%
 # plot for the paper
-fig = plt.figure(figsize=(9.6, 3.2), dpi=DPI)
+beta = 0.357
+fig = plt.figure(figsize=(9.6, 2.5), dpi=DPI)
 plt.subplot(1, 3, 1)
 
 g_q = hnn_ode_struct_model.g_net(cos_q_sin_q)
-plt.plot(q, g_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $g_{\theta_3}(q)$', color='r')
-plt.plot(q, np.ones_like(q), label='Ground Truth', color='k')
+plt.plot(q, np.ones_like(q), label='Ground Truth', color='k', linewidth=2)
+plt.plot(q, beta * g_q.detach().cpu().numpy(), 'b--', linewidth=3, label=r'SymODEN $\beta g_{\theta_3}(q)$')
 plt.xlabel("$q$", fontsize=14)
 # plt.ylabel("$g(q)$", rotation=0, fontsize=14)
 plt.title("$g(q)$", pad=10, fontsize=14)
 plt.xlim(-5, 5)
 plt.ylim(0, 4)
-plt.legend(fontsize=8)
+plt.legend(fontsize=10)
 
 M_q_inv = hnn_ode_struct_model.M_net(cos_q_sin_q)
 plt.subplot(1, 3, 2)
-plt.plot(q, M_q_inv.detach().cpu().numpy(), label=r'Symplectic ODE-Net $M^{-1}_{\theta_1}(q)$', color='r')
-plt.plot(q, 3 * np.ones_like(q), label='Ground Truth', color='k')
+plt.plot(q, 3 * np.ones_like(q), label='Ground Truth', color='k', linewidth=2)
+plt.plot(q, M_q_inv.detach().cpu().numpy()/beta, 'b--', linewidth=3, label=r'SymODEN $M^{-1}_{\theta_1}(q)/\beta$')
 plt.xlabel("$q$", fontsize=14)
 # plt.ylabel("$M^{-1}(q)$", rotation=0, fontsize=14)
 plt.title("$M^{-1}(q)$", pad=10, fontsize=14)
 plt.xlim(-5, 5)
 plt.ylim(0, 4)
-plt.legend(fontsize=8)
+plt.legend(fontsize=10)
 
 V_q = hnn_ode_struct_model.V_net(cos_q_sin_q)
 plt.subplot(1, 3, 3)
-plt.plot(q, V_q.detach().cpu().numpy(), label=r'Symplectic ODE-Net $V_{\theta_2}(q)$', color='r')
-plt.plot(q, 5.-5. * np.cos(q), label='Ground Truth', color='k')
+plt.plot(q, 5.-5. * np.cos(q), label='Ground Truth', color='k', linewidth=2)
+plt.plot(q, beta * V_q.detach().cpu().numpy(), 'b--', label=r'SymODEN $\beta V_{\theta_2}(q)$', linewidth=3)
 plt.xlabel("$q$", fontsize=14)
 # plt.ylabel("$V(q)$", rotation=0, fontsize=14)
 plt.title("$V(q)$", pad=10, fontsize=14)
 plt.xlim(-5, 5)
-plt.ylim(-15, 25)
-plt.legend(fontsize=8)
+plt.ylim(-7, 22)
+plt.legend(fontsize=10)
 plt.tight_layout()
-# fig.savefig('{}/fig-single-embed.{}'.format(args.fig_dir, FORMAT))
+fig.savefig('{}/fig-single-embed.{}'.format(args.fig_dir, FORMAT))
 
 #%%
 # comapring the estimated p and the true p
@@ -532,33 +533,35 @@ y_traj = torch.stack(y_traj).view(-1, 4).detach().cpu().numpy()
 
 #%%
 # plot control result
-fig = plt.figure(figsize=[14, 3.2], dpi=DPI)
-plt.subplot(1, 4, 1)
-plt.plot(t_eval.numpy(), y_traj[:, 0])
-plt.ylabel('$cos(q)$', fontsize=14)
+fig = plt.figure(figsize=[10, 2.2], dpi=DPI)
+# plt.subplot(1, 4, 1)
+# 
+# 
+# plt.xlabel('$t$', fontsize=14)
+# plt.ylim([-1.1, 1.1])
+
+plt.subplot(1, 3, 1)
+plt.plot(t_eval.numpy(), y_traj[:, 1], 'k', label=r'$sin(q)$', linewidth=2)
+plt.plot(t_eval.numpy(), y_traj[:, 0], 'k--', label=r'$cos(q)$', linewidth=2)
+plt.title('$q$', fontsize=14)
 plt.xlabel('$t$', fontsize=14)
 plt.ylim([-1.1, 1.1])
+plt.legend(fontsize=10)
 
-plt.subplot(1, 4, 2)
-plt.plot(t_eval.numpy(), y_traj[:, 1])
-plt.ylabel('$sin(q)$', fontsize=14)
+plt.subplot(1, 3, 2)
+plt.plot(t_eval.numpy(), y_traj[:, 2], 'k', linewidth=2)
+plt.title('$\dot{q}$', fontsize=14)
 plt.xlabel('$t$', fontsize=14)
-plt.ylim([-1.1, 1.1])
+plt.ylim([-4.1, 4.1])
 
-plt.subplot(1, 4, 3)
-plt.plot(t_eval.numpy(), y_traj[:, 2])
-plt.ylabel('$\dot{q}$', fontsize=14)
+plt.subplot(1, 3, 3)
+plt.plot(t_eval.numpy(), y_traj[:, 3], 'k', linewidth=2)
+plt.title('$u$', fontsize=14)
 plt.xlabel('$t$', fontsize=14)
-plt.ylim([-3.1, 3.1])
-
-plt.subplot(1, 4, 4)
-plt.plot(t_eval.numpy(), y_traj[:, 3])
-plt.ylabel('$u$', fontsize=14)
-plt.xlabel('$t$', fontsize=14)
-plt.ylim([-8.1, 8.1])
+plt.ylim([-10.1, 10.1])
 
 plt.tight_layout() ; plt.show()
-fig.savefig('{}/pend-single-embed-ctrl-p{}.{}'.format(args.fig_dir, args.num_points, FORMAT))
+fig.savefig('{}/fig-embed-ctrl.{}'.format(args.fig_dir, FORMAT))
 
 
 #%%
