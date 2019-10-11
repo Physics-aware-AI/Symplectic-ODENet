@@ -1,3 +1,6 @@
+# Modified from OpenAI gym CartPole-v1 task
+# https://github.com/openai/gym/blob/master/gym/envs/classic_control/cartpole.py
+
 """
 Classic cart-pole system implemented by Rich Sutton et al.
 Copied from http://incompleteideas.net/sutton/book/code/pole.c
@@ -162,7 +165,7 @@ class CartPoleEnv(gym.Env):
         screen_width = 600
         screen_height = 400
 
-        world_width = self.x_threshold*2
+        world_width = 2.4*2
         scale = screen_width/world_width
         carty = 100 # TOP OF CART
         polewidth = 10.0

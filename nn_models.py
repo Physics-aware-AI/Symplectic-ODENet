@@ -1,4 +1,7 @@
-# code borrowed from Sam Greydanus
+# Symplectic ODE-Net | 2019
+# Yaofeng Desmond Zhong, Biswadip Dey, Amit Chakraborty
+
+# code structure follows the style of HNN by Sam Greydanus
 # https://github.com/greydanus/hamiltonian-nn
 
 import torch
@@ -7,7 +10,7 @@ from utils import choose_nonlinearity
 
 
 class MLP(torch.nn.Module):
-    '''Just a salt-of-the-earth MLP'''
+    '''Just a MLP'''
     def __init__(self, input_dim, hidden_dim, output_dim, nonlinearity='tanh', bias_bool=True):
         super(MLP, self).__init__()
         self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
@@ -82,7 +85,7 @@ class PSD(torch.nn.Module):
 
 
 class DampMatrix(torch.nn.Module):
-    '''A Neural Net which outputs a 2*2 damping matrix'''
+    '''(not used in the paper) A Neural Net which outputs a 2*2 damping matrix'''
     def __init__(self, input_dim, hidden_dim, diag_dim, device, nonlinearity='tanh'):
         super(DampMatrix, self).__init__()
         assert diag_dim > 1
@@ -106,49 +109,3 @@ class DampMatrix(torch.nn.Module):
         D = torch.zeros(bs, 2, 2, device=self.device)
         D[:, 1, 1] = d*d * torch.ones(bs).to(self.device)
         return D
-
-class ConstraintNet(torch.nn.Module):
-    '''A Neural Net which outputs a structured constraint matrix specified by the interconnection'''
-    def __init__(self, input_dim, hidden_dim, num_links, num_constraints, nonlinearity='tanh'):
-        super(ConstraintNet, self).__init__()
-        self.num_links = num_links
-        self.num_constraints = num_constraints
-
-        self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
-        self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = torch.nn.Linear(hidden_dim, num_constraints*num_links*3)
-
-        for l in [self.linear1, self.linear2, self.linear3]:
-            torch.nn.init.orthogonal_(l.weight) # use a principled initialization
-        
-        self.nonlinearity = choose_nonlinearity(nonlinearity)
-
-    def forward(self, x):
-        bs = x.shape[0]
-        h = self.nonlinearity( self.linear1(x) )
-        h = self.nonlinearity( self.linear2(h) )
-        y = self.nonlinearity( self.linear3(h) )
-
-        return torch.reshape(y, (bs, 3*self.num_links, self.num_constraints))
-
-class Decoder(torch.nn.Module):
-    '''Periodic Decoder'''
-    def __init__(self, input_dim, hidden_dim, output_dim, nonlinearity='tanh', bias_bool=True):
-        super(Decoder, self).__init__()
-        assert input_dim % 2 == 0
-        self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
-        self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
-        self.linear3 = torch.nn.Linear(hidden_dim, output_dim, bias=bias_bool)
-
-        for l in [self.linear1, self.linear2, self.linear3]:
-            torch.nn.init.orthogonal_(l.weight) # use a principled initialization
-
-        self.nonlinearity = choose_nonlinearity(nonlinearity)
-
-    def forward(self, x, separate_fields=False):
-        q, p = torch.chunk(x, 2, dim=1)
-        sin_q = torch.sin(q)
-        x = torch.cat((sin_q, p), dim=1)
-        h = self.nonlinearity( self.linear1(x) )
-        h = self.nonlinearity( self.linear2(h) )
-        return self.linear3(h)

@@ -1,3 +1,6 @@
+# Modified from OpenAI gym Acrobot-v1 task
+# https://github.com/openai/gym/blob/master/gym/envs/classic_control/acrobot.py
+
 """classic Acrobot task"""
 import numpy as np
 from numpy import sin, cos, pi

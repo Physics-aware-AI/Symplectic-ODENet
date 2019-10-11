@@ -1,3 +1,6 @@
+# Modified from OpenAI gym Pendulum-v0 task
+# https://github.com/openai/gym/blob/master/gym/envs/classic_control/pendulum.py
+
 import gym
 from gym import spaces
 from gym.utils import seeding

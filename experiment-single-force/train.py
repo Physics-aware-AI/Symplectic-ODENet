@@ -1,4 +1,7 @@
-# code borrowed from Sam Greydanus
+# Symplectic ODE-Net | 2019
+# Yaofeng Desmond Zhong, Biswadip Dey, Amit Chakraborty
+
+# code structure follows the style of HNN by Sam Greydanus
 # https://github.com/greydanus/hamiltonian-nn
 
 import torch, argparse
@@ -9,7 +12,7 @@ THIS_DIR = os.path.dirname(os.path.abspath(__file__))
 PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PARENT_DIR)
 
-from nn_models import MLP, PSD, ConstraintNet
+from nn_models import MLP, PSD
 from hnn import HNN_structure_forcing
 from data import get_dataset, arrange_data
 from utils import L2_loss, to_pickle
@@ -46,7 +49,6 @@ def train(args):
     from torchdiffeq import odeint_adjoint as odeint
 
     device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
-    # device = torch.device('cpu')
     # reproducibility: set random seed
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
@@ -55,10 +57,7 @@ def train(args):
 
     # init model and optimizer
     if args.verbose:
-        print("Training baseline ODE model with num of points = {}:".format(args.num_points) if args.baseline 
-            else "Training HNN ODE model with num of points = {}:".format(args.num_points))
-        if args.structure:
-            print("using the structured Hamiltonian")
+        print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver) 
     
     if args.structure == False and args.baseline == True:
         nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity).to(device)    
@@ -68,7 +67,6 @@ def train(args):
         g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2)).to(device)
         model = HNN_structure_forcing(args.input_dim, H_net=H_net, g_net=g_net, device=device, baseline=False)
     elif args.structure == True and args.baseline ==False:
-        # M_net = MLP(1, args.hidden_dim, 1).to(device)
         M_net = MLP(int(args.input_dim/2), 300, int(args.input_dim/2))
         V_net = MLP(int(args.input_dim/2), 50, 1).to(device)
         g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2)).to(device)

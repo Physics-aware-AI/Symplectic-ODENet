@@ -1,4 +1,7 @@
-# code borrowed from Sam Greydanus
+# Symplectic ODE-Net | 2019
+# Yaofeng Desmond Zhong, Biswadip Dey, Amit Chakraborty
+
+# code structure follows the style of HNN by Sam Greydanus
 # https://github.com/greydanus/hamiltonian-nn
 
 import torch, argparse
@@ -55,10 +58,7 @@ def train(args):
 
     # init model and optimizer
     if args.verbose:
-        print("Training baseline ODE model with num of points = {}:".format(args.num_points) if args.baseline 
-            else "Training HNN ODE model with num of points = {}:".format(args.num_points))
-        if args.structure:
-            print("using the structured Hamiltonian")
+        print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver) 
 
     M_net = PSD(2*args.num_angle, 300, args.num_angle).to(device)
     g_net = MLP(2*args.num_angle, 200, args.num_angle).to(device)
@@ -92,11 +92,7 @@ def train(args):
     optim = torch.optim.Adam(model.parameters(), args.learn_rate, weight_decay=1e-4)
 
     # arrange data
-    # us = [-2.0, -1.0, 0.0, 1.0, 2.0]
     us = [0.0, -1.0, 1.0, -2.0, 2.0]
-    # us = [0.0, -2.0, 2.0, -4.0, 4.0, -6.0, 6.0]
-    # us = np.linspace(-2.0, 2.0, 20)
-    # us = [0.0]
     data = get_dataset(seed=args.seed, timesteps=20,
                 save_dir=args.save_dir, us=us, samples=2048) #us=np.linspace(-2.0, 2.0, 20)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
@@ -109,13 +105,12 @@ def train(args):
     # training loop
     stats = {'train_loss': [], 'test_loss': [], 'forward_time': [], 'backward_time': [],'nfe': []}
     bs = train_x.shape[-2]
-    # mini_bs = 320
+
     for step in range(args.total_steps+1):
         train_loss = 0
         test_loss = 0
         for i in range(train_x.shape[0]):
-            # for j in range(int(bs/mini_bs)+1):
-            #     bs_ind = np.random.choice(bs, mini_bs)
+
             t = time.time()
             train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver) # (4, 25*44, 2)
             forward_time = time.time() - t
