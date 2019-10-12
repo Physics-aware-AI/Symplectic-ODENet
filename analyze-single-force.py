@@ -19,8 +19,8 @@ EXPERIMENT_DIR = './experiment-single-force/'
 sys.path.append(EXPERIMENT_DIR)
 
 from data import get_dataset, get_trajectory, dynamics_fn, hamiltonian_fn, arrange_data, get_field
-from nn_models import MLP, PSD, DampMatrix
-from hnn import HNN, HNN_structure, HNN_structure_forcing
+from nn_models import MLP, PSD
+from hnn import HNN_structure_forcing
 from utils import L2_loss, from_pickle
 
 #%%

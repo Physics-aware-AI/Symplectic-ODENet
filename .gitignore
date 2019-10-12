@@ -4,3 +4,4 @@ __pycache__
 *.pkl
 .vscode/
 scratch.py
+.ipynb_checkpoints/
