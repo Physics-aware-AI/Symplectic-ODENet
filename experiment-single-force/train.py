@@ -57,7 +57,7 @@ def train(args):
 
     # init model and optimizer
     if args.verbose:
-        print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver) 
+        print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver))
     
     if args.structure == False and args.baseline == True:
         nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity).to(device)    
@@ -83,11 +83,11 @@ def train(args):
     us = [-2.0, -1.0, 0.0, 1.0, 2.0]
     # us = [0.0]
     data = get_dataset(seed=args.seed,
-                    save_dir=args.save_dir, rad=args.rad, us=us, samples=512) #us=np.linspace(-2.0, 2.0, 20)
+                    save_dir=args.save_dir, rad=args.rad, us=us, samples=128) 
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
-    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
+    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) 
     test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
     t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
 
@@ -126,7 +126,7 @@ def train(args):
     train_x, t_eval = data['x'], data['t']
     test_x, t_eval = data['test_x'], data['t']
 
-    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
+    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device)
     test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
     t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
 

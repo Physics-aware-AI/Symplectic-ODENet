@@ -58,7 +58,7 @@ def train(args):
 
     # init model and optimizer
     if args.verbose:
-        print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver) 
+        print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver))
 
     M_net = PSD(2*args.num_angle, 300, args.num_angle).to(device)
     g_net = MLP(2*args.num_angle, 200, args.num_angle).to(device)
@@ -94,11 +94,11 @@ def train(args):
     # arrange data
     us = [0.0, -1.0, 1.0, -2.0, 2.0]
     data = get_dataset(seed=args.seed, timesteps=20,
-                save_dir=args.save_dir, us=us, samples=2048) #us=np.linspace(-2.0, 2.0, 20)
+                save_dir=args.save_dir, us=us, samples=128)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
-    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
+    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device)
     test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
     t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
 
@@ -112,7 +112,7 @@ def train(args):
         for i in range(train_x.shape[0]):
 
             t = time.time()
-            train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver) # (4, 25*44, 2)
+            train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver) 
             forward_time = time.time() - t
             train_loss_mini = L2_loss(train_x[i,:,:,:], train_x_hat)
             train_loss = train_loss + train_loss_mini 
@@ -140,7 +140,7 @@ def train(args):
     train_x, t_eval = data['x'], data['t']
     test_x, t_eval = data['test_x'], data['t']
 
-    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) # (45, 25, 2)
+    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) 
     test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
     t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
 
