@@ -9,14 +9,14 @@ import numpy as np
 
 from nn_models import MLP
 
-class HNN_structure_forcing(torch.nn.Module):
+class SymODEN_R(torch.nn.Module):
     '''
     Architecture for input (q, p, u), 
     where q and p are tensors of size (bs, n) and u is a tensor of size (bs, 1)
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None, device=None,
                     assume_canonical_coords=True, baseline=False, structure=False):
-        super(HNN_structure_forcing, self).__init__()
+        super(SymODEN_R, self).__init__()
         self.baseline = baseline
         self.structure = structure
         if self.structure:
@@ -87,7 +87,7 @@ class HNN_structure_forcing(torch.nn.Module):
         return M.to(self.device)
 
 
-class HNN_structure_embed(torch.nn.Module):
+class SymODEN_T(torch.nn.Module):
     '''
     Architecture for input (cos q, sin q, q_dot, u), 
     where q represent angles, a tensor of size (bs, n),
@@ -96,7 +96,7 @@ class HNN_structure_embed(torch.nn.Module):
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None,
             device=None, baseline=False, structure=False, naive=False):
-        super(HNN_structure_embed, self).__init__()
+        super(SymODEN_T, self).__init__()
         self.baseline = baseline
         self.structure = structure
         self.naive = naive
@@ -212,14 +212,14 @@ class HNN_structure_embed(torch.nn.Module):
         return H, dH
 
 
-class HNN_structure_cart_embed(torch.nn.Module):
+class SymODEN_R1_T1(torch.nn.Module):
     '''
     Architecture for the cartpole system (x, cos q, sin q, x_dot, q_dot, u), 
     where x, cos q, sin q, x_dot, q_dot and u are all tensors of size (bs, 1)
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None,
             device=None, baseline=False, structure=False, naive=False):
-        super(HNN_structure_cart_embed, self).__init__()
+        super(SymODEN_R1_T1, self).__init__()
         self.baseline = baseline
         self.structure = structure
         self.naive = naive

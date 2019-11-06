@@ -19,7 +19,7 @@ sys.path.append(EXPERIMENT_DIR)
 
 from data import get_dataset, arrange_data, get_field
 from nn_models import MLP, PSD
-from hnn import HNN_structure_cart_embed
+from symoden import SymODEN_R1_T1
 from utils import L2_loss, from_pickle
 import imageio
 
@@ -60,20 +60,20 @@ def get_model(args, baseline, structure, naive, damping, num_points):
             input_dim = 6
             output_dim = 5
             nn_model = MLP(input_dim, 1000, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, device=device, baseline=baseline, naive=naive)
+            model = SymODEN_R1_T1(args.num_angle, H_net=nn_model, device=device, baseline=baseline, naive=naive)
         elif baseline:
             input_dim = 6
             output_dim = 4
             nn_model = MLP(input_dim, 700, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
+            model = SymODEN_R1_T1(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
         else:
             input_dim = 5
             output_dim = 1
             nn_model = MLP(input_dim, 500, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
+            model = SymODEN_R1_T1(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
     elif structure == True and baseline ==False and naive==False:
         V_net = MLP(3, 300, 1).to(device)
-        model = HNN_structure_cart_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
+        model = SymODEN_R1_T1(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
 
@@ -92,8 +92,8 @@ def get_model(args, baseline, structure, naive, damping, num_points):
 
 naive_ode_model, naive_ode_stats = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
 base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
+symoden_ode_model, symoden_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
+symoden_ode_struct_model, symoden_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
 
 #%% [markdown]
 # ## Final training loss
@@ -112,15 +112,15 @@ print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss
 .format(np.mean(base_ode_stats['traj_train_loss']), np.std(base_ode_stats['traj_train_loss']),
         np.mean(base_ode_stats['traj_test_loss']), np.std(base_ode_stats['traj_test_loss'])))
 print('')
-print('Unstructured SymODEN contains {} parameters'.format(get_model_parm_nums(hnn_ode_model)))
+print('Unstructured SymODEN contains {} parameters'.format(get_model_parm_nums(symoden_ode_model)))
 print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_ode_stats['traj_train_loss']), np.std(hnn_ode_stats['traj_train_loss']),
-        np.mean(hnn_ode_stats['traj_test_loss']), np.std(hnn_ode_stats['traj_test_loss'])))
+.format(np.mean(symoden_ode_stats['traj_train_loss']), np.std(symoden_ode_stats['traj_train_loss']),
+        np.mean(symoden_ode_stats['traj_test_loss']), np.std(symoden_ode_stats['traj_test_loss'])))
 print('')
-print('SymODEN contains {} parameters'.format(get_model_parm_nums(hnn_ode_struct_model)))
+print('SymODEN contains {} parameters'.format(get_model_parm_nums(symoden_ode_struct_model)))
 print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_ode_struct_stats['traj_train_loss']), np.std(hnn_ode_struct_stats['traj_train_loss']),
-        np.mean(hnn_ode_struct_stats['traj_test_loss']), np.std(hnn_ode_struct_stats['traj_test_loss'])))
+.format(np.mean(symoden_ode_struct_stats['traj_train_loss']), np.std(symoden_ode_struct_stats['traj_train_loss']),
+        np.mean(symoden_ode_struct_stats['traj_test_loss']), np.std(symoden_ode_struct_stats['traj_test_loss'])))
 
 #%% [markdown]
 # ## Dataset to get prediction error
@@ -150,8 +150,8 @@ def get_pred_loss(pred_x, pred_t_eval, model):
 
 naive_pred_loss = get_pred_loss(pred_x, pred_t_eval, naive_ode_model)
 base_pred_loss = get_pred_loss(pred_x, pred_t_eval, base_ode_model)
-hnn_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_model)
-hnn_struct_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_struct_model)
+symoden_pred_loss = get_pred_loss(pred_x, pred_t_eval, symoden_ode_model)
+symoden_struct_pred_loss = get_pred_loss(pred_x, pred_t_eval, symoden_ode_struct_model)
 
 
 #%%
@@ -165,11 +165,11 @@ print('Prediction error {:.4e} +/- {:.4e}'
 print('')
 print('Unstructured SymODEN')
 print('Prediction error {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_pred_loss), np.std(hnn_pred_loss)))
+.format(np.mean(symoden_pred_loss), np.std(symoden_pred_loss)))
 print('')
 print('SymODEN')
 print('Prediction error {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_struct_pred_loss), np.std(hnn_struct_pred_loss)))
+.format(np.mean(symoden_struct_pred_loss), np.std(symoden_struct_pred_loss)))
 
 #%% [markdown]
 # ## Integrate to get trajectories
@@ -200,8 +200,8 @@ y0_u = np.asarray([x0, np.cos(q0), np.sin(q0), 0.0, 0.0, u0])
 kwargs = {'t_eval': t_linspace_model, 'rtol': 1e-12, 'method': 'RK45'}
 
 base_ivp = integrate_model(base_ode_model, t_span, y0_u, **kwargs)
-hnn_ivp = integrate_model(hnn_ode_model, t_span, y0_u, **kwargs)
-hnn_struct_ivp = integrate_model(hnn_ode_struct_model, t_span, y0_u, **kwargs)
+symoden_ivp = integrate_model(symoden_ode_model, t_span, y0_u, **kwargs)
+symoden_struct_ivp = integrate_model(symoden_ode_struct_model, t_span, y0_u, **kwargs)
 
 import gym 
 import myenv
@@ -224,33 +224,33 @@ for _ in range(1):
     fig = plt.figure(figsize=(10, 10), dpi=DPI)
     plt.subplot(5, 1, 1)
     plt.plot(t_linspace_model, base_ivp.y[0,:], 'r', label='Geometric Baseline')
-    plt.plot(t_linspace_model, hnn_ivp.y[0,:], 'g', label='unstructured SymODEN')
-    plt.plot(t_linspace_model, hnn_struct_ivp.y[0,:], 'b', label='SymODEN')
+    plt.plot(t_linspace_model, symoden_ivp.y[0,:], 'g', label='unstructured SymODEN')
+    plt.plot(t_linspace_model, symoden_struct_ivp.y[0,:], 'b', label='SymODEN')
     plt.plot(t_linspace_true, true_ivp[0,:], 'k')
     plt.legend(fontsize=10)
 
     plt.subplot(5, 1, 2)
     plt.plot(t_linspace_model, base_ivp.y[1,:], 'r', label='Geometric Baseline')
-    plt.plot(t_linspace_model, hnn_ivp.y[1,:], 'g', label='unstructured SymODEN')
-    plt.plot(t_linspace_model, hnn_struct_ivp.y[1,:], 'b', label='SymODEN')
+    plt.plot(t_linspace_model, symoden_ivp.y[1,:], 'g', label='unstructured SymODEN')
+    plt.plot(t_linspace_model, symoden_struct_ivp.y[1,:], 'b', label='SymODEN')
     plt.plot(t_linspace_true, true_ivp[1,:], 'k')
 
     plt.subplot(5, 1, 3)
     plt.plot(t_linspace_model, base_ivp.y[2,:], 'r', label='Geometric Baseline')
-    plt.plot(t_linspace_model, hnn_ivp.y[2,:], 'g', label='unstructured SymODEN')
-    plt.plot(t_linspace_model, hnn_struct_ivp.y[2,:], 'b', label='SymODEN')
+    plt.plot(t_linspace_model, symoden_ivp.y[2,:], 'g', label='unstructured SymODEN')
+    plt.plot(t_linspace_model, symoden_struct_ivp.y[2,:], 'b', label='SymODEN')
     plt.plot(t_linspace_true, true_ivp[2,:], 'k')
 
     plt.subplot(5, 1, 4)
     plt.plot(t_linspace_model, base_ivp.y[3,:], 'r', label='Geometric Baseline')
-    plt.plot(t_linspace_model, hnn_ivp.y[3,:], 'g', label='unstructured SymODEN')
-    plt.plot(t_linspace_model, hnn_struct_ivp.y[3,:], 'b', label='SymODEN')
+    plt.plot(t_linspace_model, symoden_ivp.y[3,:], 'g', label='unstructured SymODEN')
+    plt.plot(t_linspace_model, symoden_struct_ivp.y[3,:], 'b', label='SymODEN')
     plt.plot(t_linspace_true, true_ivp[3,:], 'k')
 
     plt.subplot(5, 1, 5)
     plt.plot(t_linspace_model, base_ivp.y[4,:], 'r', label='Geometric Baseline')
-    plt.plot(t_linspace_model, hnn_ivp.y[4,:], 'g', label='unstructured SymODEN')
-    plt.plot(t_linspace_model, hnn_struct_ivp.y[4,:], 'b', label='SymODEN')
+    plt.plot(t_linspace_model, symoden_ivp.y[4,:], 'g', label='unstructured SymODEN')
+    plt.plot(t_linspace_model, symoden_struct_ivp.y[4,:], 'b', label='SymODEN')
     plt.plot(t_linspace_true, true_ivp[4,:], 'k')
 
 #%% [markdown]
@@ -287,14 +287,14 @@ for i in range(len(t_eval)-1):
     frames.append(env.render(mode='rgb_array'))
 
     x_cos_q_sin_q, x_dot_q_dot, u = torch.split(y, [3, 2, 1], dim=1)
-    M_q_inv = hnn_ode_struct_model.M_net(x_cos_q_sin_q)
+    M_q_inv = symoden_ode_struct_model.M_net(x_cos_q_sin_q)
     x_dot_q_dot_aug = torch.unsqueeze(x_dot_q_dot, dim=2)
     p = torch.squeeze(torch.matmul(torch.inverse(M_q_inv), x_dot_q_dot_aug), dim=2)
     x_cos_q_sin_q_p = torch.cat((x_cos_q_sin_q, p), dim=1)
     x_cos_q_sin_q, p = torch.split(x_cos_q_sin_q_p, [3, 2], dim=1)
-    M_q_inv = hnn_ode_struct_model.M_net(x_cos_q_sin_q)
+    M_q_inv = symoden_ode_struct_model.M_net(x_cos_q_sin_q)
     _, cos_q, sin_q = torch.chunk(x_cos_q_sin_q, 3,dim=1)
-    V_q = hnn_ode_struct_model.V_net(x_cos_q_sin_q)   
+    V_q = symoden_ode_struct_model.V_net(x_cos_q_sin_q)   
     p_aug = torch.unsqueeze(p, dim=2)
     H = torch.squeeze(torch.matmul(torch.transpose(p_aug, 1, 2), torch.matmul(M_q_inv, p_aug)))/2.0 + torch.squeeze(V_q)
     dH = torch.autograd.grad(H.sum(), x_cos_q_sin_q_p, create_graph=True)[0]
@@ -302,7 +302,7 @@ for i in range(len(t_eval)-1):
     dV = torch.autograd.grad(V_q, x_cos_q_sin_q)[0]
     dVdx, dVdcos_q, dVdsin_q= torch.chunk(dV, 3, dim=1)
     dV_q = - dVdcos_q * sin_q + dVdsin_q * cos_q
-    g_xq = hnn_ode_struct_model.g_net(x_cos_q_sin_q)
+    g_xq = symoden_ode_struct_model.g_net(x_cos_q_sin_q)
     g_norm = torch.sum(g_xq * g_xq, dim=1)
 
     k_p = 100.0 ; k_d = 2.0

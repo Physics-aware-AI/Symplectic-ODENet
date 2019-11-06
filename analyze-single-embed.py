@@ -19,7 +19,7 @@ sys.path.append(EXPERIMENT_DIR)
 
 from data import get_dataset, arrange_data, get_field
 from nn_models import MLP, PSD
-from hnn import HNN_structure_embed
+from symoden import SymODEN_T
 from utils import L2_loss, from_pickle
 import imageio
 
@@ -55,20 +55,20 @@ def get_model(args, baseline, structure, naive, damping, num_points):
             input_dim = 4 * args.num_angle
             output_dim = 3 * args.num_angle
             nn_model = MLP(input_dim, 800, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_embed(args.num_angle, H_net=nn_model, device=device, baseline=baseline, naive=naive)
+            model = SymODEN_T(args.num_angle, H_net=nn_model, device=device, baseline=baseline, naive=naive)
         elif baseline:
             input_dim = 4 * args.num_angle
             output_dim = 2 * args.num_angle
             nn_model = MLP(input_dim, 600, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
+            model = SymODEN_T(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=baseline, naive=naive)
         else:
             input_dim = 3 * args.num_angle
             output_dim = 1
             nn_model = MLP(input_dim, 500, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
+            model = SymODEN_T(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=baseline, naive=naive)
     elif structure == True and baseline ==False and naive==False:
         V_net = MLP(2*args.num_angle, 50, 1).to(device)
-        model = HNN_structure_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
+        model = SymODEN_T(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
 
@@ -87,8 +87,8 @@ def get_model(args, baseline, structure, naive, damping, num_points):
 
 naive_ode_model, naive_ode_stats = get_model(args, baseline=False, structure=False, naive=True, damping=False, num_points=args.num_points)
 base_ode_model, base_ode_stats = get_model(args, baseline=True, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_model, hnn_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
-hnn_ode_struct_model, hnn_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
+symoden_ode_model, symoden_ode_stats = get_model(args, baseline=False, structure=False, naive=False, damping=False, num_points=args.num_points)
+symoden_ode_struct_model, symoden_ode_struct_stats = get_model(args, baseline=False, structure=True, naive=False, damping=False, num_points=args.num_points)
 
 #%% [markdown]
 # ## Final training loss
@@ -107,15 +107,15 @@ print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss
 .format(np.mean(base_ode_stats['traj_train_loss']), np.std(base_ode_stats['traj_train_loss']),
         np.mean(base_ode_stats['traj_test_loss']), np.std(base_ode_stats['traj_test_loss'])))
 print('')
-print('Unstructured SymODEN contains {} parameters'.format(get_model_parm_nums(hnn_ode_model)))
+print('Unstructured SymODEN contains {} parameters'.format(get_model_parm_nums(symoden_ode_model)))
 print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_ode_stats['traj_train_loss']), np.std(hnn_ode_stats['traj_train_loss']),
-        np.mean(hnn_ode_stats['traj_test_loss']), np.std(hnn_ode_stats['traj_test_loss'])))
+.format(np.mean(symoden_ode_stats['traj_train_loss']), np.std(symoden_ode_stats['traj_train_loss']),
+        np.mean(symoden_ode_stats['traj_test_loss']), np.std(symoden_ode_stats['traj_test_loss'])))
 print('')
-print('SymODEN contains {} parameters'.format(get_model_parm_nums(hnn_ode_struct_model)))
+print('SymODEN contains {} parameters'.format(get_model_parm_nums(symoden_ode_struct_model)))
 print('Final trajectory train loss {:.4e} +/- {:.4e}\nFinal trajectory test loss {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_ode_struct_stats['traj_train_loss']), np.std(hnn_ode_struct_stats['traj_train_loss']),
-        np.mean(hnn_ode_struct_stats['traj_test_loss']), np.std(hnn_ode_struct_stats['traj_test_loss'])))
+.format(np.mean(symoden_ode_struct_stats['traj_train_loss']), np.std(symoden_ode_struct_stats['traj_train_loss']),
+        np.mean(symoden_ode_struct_stats['traj_test_loss']), np.std(symoden_ode_struct_stats['traj_test_loss'])))
 
 #%% [markdown]
 # ## Dataset to get prediction error
@@ -144,8 +144,8 @@ def get_pred_loss(pred_x, pred_t_eval, model):
 
 naive_pred_loss = get_pred_loss(pred_x, pred_t_eval, naive_ode_model)
 base_pred_loss = get_pred_loss(pred_x, pred_t_eval, base_ode_model)
-hnn_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_model)
-hnn_struct_pred_loss = get_pred_loss(pred_x, pred_t_eval, hnn_ode_struct_model)
+symoden_pred_loss = get_pred_loss(pred_x, pred_t_eval, symoden_ode_model)
+symoden_struct_pred_loss = get_pred_loss(pred_x, pred_t_eval, symoden_ode_struct_model)
 
 
 #%%
@@ -159,11 +159,11 @@ print('Prediction error {:.4e} +/- {:.4e}'
 print('')
 print('Unstructured SymODEN')
 print('Prediction error {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_pred_loss), np.std(hnn_pred_loss)))
+.format(np.mean(symoden_pred_loss), np.std(symoden_pred_loss)))
 print('')
 print('SymODEN')
 print('Prediction error {:.4e} +/- {:.4e}'
-.format(np.mean(hnn_struct_pred_loss), np.std(hnn_struct_pred_loss)))
+.format(np.mean(symoden_struct_pred_loss), np.std(symoden_struct_pred_loss)))
 
 
 #%% [markdown]
@@ -193,8 +193,8 @@ y0_u = np.asarray([np.cos(init_angle), np.sin(init_angle), 0, u0])
 kwargs = {'t_eval': t_linspace_model, 'rtol': 1e-12, 'method': 'RK45'}
 naive_ivp = integrate_model(naive_ode_model, t_span, y0_u, **kwargs)
 base_ivp = integrate_model(base_ode_model, t_span, y0_u, **kwargs)
-hnn_ivp = integrate_model(hnn_ode_model, t_span, y0_u, **kwargs)
-hnn_struct_ivp = integrate_model(hnn_ode_struct_model, t_span, y0_u, **kwargs)
+symoden_ivp = integrate_model(symoden_ode_model, t_span, y0_u, **kwargs)
+symoden_struct_ivp = integrate_model(symoden_ode_struct_model, t_span, y0_u, **kwargs)
 
 import gym 
 import myenv
@@ -218,13 +218,13 @@ def get_qp(x):
 true_qp = get_qp(true_ivp.T)
 naive_qp = get_qp(naive_ivp.y.T)
 base_qp = get_qp(base_ivp.y.T)
-hnn_qp = get_qp(hnn_ivp.y.T)
-hnn_struct_qp = get_qp(hnn_struct_ivp.y.T)
+symoden_qp = get_qp(symoden_ivp.y.T)
+symoden_struct_qp = get_qp(symoden_struct_ivp.y.T)
 
 #%%
 # comparing true trajectory and the estimated trajectory
 
-# plt.plot(t_linspace_model, hnn_struct_ivp.y[1,:], 'r')
+# plt.plot(t_linspace_model, symoden_struct_ivp.y[1,:], 'r')
 # plt.plot(t_linspace_true, true_ivp[1,:], 'g')
 
 #%% [markdown]
@@ -233,20 +233,20 @@ hnn_struct_qp = get_qp(hnn_struct_ivp.y.T)
 #%%
 naive_1 = naive_ivp.y[0,:]**2 + naive_ivp.y[1,:]**2
 base_1 = base_ivp.y[0,:]**2 + base_ivp.y[1,:]**2
-hnn_1 = hnn_ivp.y[0,:]**2 + hnn_ivp.y[1,:]**2
-hnn_struct_1 = hnn_struct_ivp.y[0,:]**2 + hnn_struct_ivp.y[1,:]**2
+symoden_1 = symoden_ivp.y[0,:]**2 + symoden_ivp.y[1,:]**2
+symoden_struct_1 = symoden_struct_ivp.y[0,:]**2 + symoden_struct_ivp.y[1,:]**2
 
 plt.plot(t_linspace_model, naive_1, 'y', label='Naive Baseline')
 plt.plot(t_linspace_model, base_1, 'r', label='Geometric Baseline')
-plt.plot(t_linspace_model, hnn_1, 'g', label='unstructured SymODEN')
-plt.plot(t_linspace_model, hnn_struct_1, 'b', label='SymODEN')
+plt.plot(t_linspace_model, symoden_1, 'g', label='unstructured SymODEN')
+plt.plot(t_linspace_model, symoden_struct_1, 'b', label='SymODEN')
 plt.title(r'Sanity check of $\sin^2 q + \cos^2 q$')
 plt.legend(fontsize=10)
 
 #%%
 plt.plot(t_linspace_model, base_1, 'r', label='Geometric Baseline')
-plt.plot(t_linspace_model, hnn_1, 'g', label='unstructured SymODEN')
-plt.plot(t_linspace_model, hnn_struct_1, 'b', label='SymODEN')
+plt.plot(t_linspace_model, symoden_1, 'g', label='unstructured SymODEN')
+plt.plot(t_linspace_model, symoden_struct_1, 'b', label='SymODEN')
 plt.title(r'Sanity check of $\sin^2 q + \cos^2 q$')
 plt.legend(fontsize=10)
 
@@ -266,7 +266,7 @@ beta = 0.357
 fig = plt.figure(figsize=(9.6, 2.5), dpi=DPI)
 plt.subplot(1, 3, 1)
 
-g_q = hnn_ode_struct_model.g_net(cos_q_sin_q)
+g_q = symoden_ode_struct_model.g_net(cos_q_sin_q)
 plt.plot(q, np.ones_like(q), label='Ground Truth', color='k', linewidth=2)
 plt.plot(q, beta * g_q.detach().cpu().numpy(), 'b--', linewidth=3, label=r'SymODEN $\beta g_{\theta_3}(q)$')
 plt.xlabel("$q$", fontsize=14)
@@ -276,7 +276,7 @@ plt.xlim(-5, 5)
 plt.ylim(0, 4)
 plt.legend(fontsize=10)
 
-M_q_inv = hnn_ode_struct_model.M_net(cos_q_sin_q)
+M_q_inv = symoden_ode_struct_model.M_net(cos_q_sin_q)
 plt.subplot(1, 3, 2)
 plt.plot(q, 3 * np.ones_like(q), label='Ground Truth', color='k', linewidth=2)
 plt.plot(q, M_q_inv.detach().cpu().numpy()/beta, 'b--', linewidth=3, label=r'SymODEN $M^{-1}_{\theta_1}(q)/\beta$')
@@ -287,7 +287,7 @@ plt.xlim(-5, 5)
 plt.ylim(0, 4)
 plt.legend(fontsize=10)
 
-V_q = hnn_ode_struct_model.V_net(cos_q_sin_q)
+V_q = symoden_ode_struct_model.V_net(cos_q_sin_q)
 plt.subplot(1, 3, 3)
 plt.plot(q, 5.-5. * np.cos(q), label='Ground Truth', color='k', linewidth=2)
 plt.plot(q, beta * V_q.detach().cpu().numpy(), 'b--', label=r'SymODEN $\beta V_{\theta_2}(q)$', linewidth=3)
@@ -307,13 +307,13 @@ plt.tight_layout()
 
 E_true = true_ivp.T[:, 2]**2 / 6 + 5 * (1 + true_ivp.T[:, 0])
 E_base = base_ivp.y.T[:, 2]**2 / 6 + 5 * (1 + base_ivp.y.T[:, 0])
-E_hnn = hnn_ivp.y.T[:, 2]**2 / 6 + 5 * (1 + hnn_ivp.y.T[:, 0])
-E_hnn_struct = hnn_struct_ivp.y.T[:, 2]**2 / 6 + 5 * (1 + hnn_struct_ivp.y.T[:, 0])
+E_symoden = symoden_ivp.y.T[:, 2]**2 / 6 + 5 * (1 + symoden_ivp.y.T[:, 0])
+E_symoden_struct = symoden_struct_ivp.y.T[:, 2]**2 / 6 + 5 * (1 + symoden_struct_ivp.y.T[:, 0])
 
 plt.plot(t_linspace_true, E_true, 'k')
 plt.plot(t_linspace_model, E_base, 'r')
-plt.plot(t_linspace_model, E_hnn, 'g')
-plt.plot(t_linspace_model, E_hnn_struct, 'b')
+plt.plot(t_linspace_model, E_symoden, 'g')
+plt.plot(t_linspace_model, E_symoden_struct, 'b')
 
 #%% [markdown]
 # ## Energy-based control
@@ -352,12 +352,12 @@ for i in range(len(t_eval)-1):
 
     cos_q_sin_q, q_dot, _ = torch.split(y, [2, 1, 1], dim=1)
     cos_q, sin_q = torch.chunk(cos_q_sin_q, 2, dim=1)
-    V_q = hnn_ode_struct_model.V_net(cos_q_sin_q)
-    g_q = hnn_ode_struct_model.g_net(cos_q_sin_q)
+    V_q = symoden_ode_struct_model.V_net(cos_q_sin_q)
+    g_q = symoden_ode_struct_model.g_net(cos_q_sin_q)
     dV = torch.autograd.grad(V_q, cos_q_sin_q)[0]
     dVdcos_q, dVdsin_q= torch.chunk(dV, 2, dim=1)
     dV_q = - dVdcos_q * sin_q + dVdsin_q * cos_q
-    M_inv = hnn_ode_struct_model.M_net(cos_q_sin_q)
+    M_inv = symoden_ode_struct_model.M_net(cos_q_sin_q)
     q = torch.atan2(sin_q, cos_q)
 
     u = 1/g_q * (2*dV_q  - k_d * q_dot)
@@ -368,12 +368,12 @@ for i in range(len(t_eval)-1):
     y = torch.tensor([obs[0], obs[1], obs[2], u], requires_grad=True, device=device, dtype=torch.float32).view(1, 4)
     # use learnt model
     # y0_u = torch.cat((cos_q_sin_q, q_dot, u), dim = 1)
-    # y_step = odeint(hnn_ode_struct_model, y0_u, t_eval[i:i+2], method='rk4')
+    # y_step = odeint(symoden_ode_struct_model, y0_u, t_eval[i:i+2], method='rk4')
     # y = y_step[-1,:,:]
 
     y_traj.append(y)
 env.close()
-imageio.mimsave('./videos/single-embed/single-embed.gif', frames, duration=0.05)
+# imageio.mimsave('./videos/single-embed/single-embed.gif', frames, duration=0.05)
 
 y_traj = torch.stack(y_traj).view(-1, 4).detach().cpu().numpy()
 

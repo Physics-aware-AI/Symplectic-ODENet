@@ -13,7 +13,7 @@ PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PARENT_DIR)
 
 from nn_models import MLP, PSD
-from hnn import HNN_structure_cart_embed
+from symoden import SymODEN_R1_T1
 from data import get_dataset, arrange_data
 from utils import L2_loss, to_pickle
 
@@ -70,20 +70,20 @@ def train(args):
             input_dim = 6
             output_dim = 5
             nn_model = MLP(input_dim, 1000, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, device=device, baseline=args.baseline, naive=args.naive)
+            model = SymODEN_R1_T1(args.num_angle, H_net=nn_model, device=device, baseline=args.baseline, naive=args.naive)
         elif args.baseline:
             input_dim = 6
             output_dim = 4
             nn_model = MLP(input_dim, 700, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=args.baseline, naive=args.naive)
+            model = SymODEN_R1_T1(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=args.baseline, naive=args.naive)
         else:
             input_dim = 5
             output_dim = 1
             nn_model = MLP(input_dim, 500, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_cart_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=args.baseline, naive=args.naive)
+            model = SymODEN_R1_T1(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=args.baseline, naive=args.naive)
     elif args.structure == True and args.baseline ==False and args.naive==False:
         V_net = MLP(3, 300, 1).to(device)
-        model = HNN_structure_cart_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
+        model = SymODEN_R1_T1(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
 

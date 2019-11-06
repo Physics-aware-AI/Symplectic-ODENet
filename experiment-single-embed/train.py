@@ -13,7 +13,7 @@ PARENT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(PARENT_DIR)
 
 from nn_models import MLP, PSD
-from hnn import HNN_structure_embed
+from symoden import SymODEN_T
 from data import get_dataset, arrange_data
 from utils import L2_loss, to_pickle
 
@@ -69,20 +69,20 @@ def train(args):
             input_dim = 3 * args.num_angle + 1
             output_dim = 3 * args.num_angle
             nn_model = MLP(input_dim, 800, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_embed(args.num_angle, H_net=nn_model, device=device, baseline=args.baseline, naive=args.naive)
+            model = SymODEN_T(args.num_angle, H_net=nn_model, device=device, baseline=args.baseline, naive=args.naive)
         elif args.baseline:
             input_dim = 3 * args.num_angle + 1
             output_dim = 2 * args.num_angle
             nn_model = MLP(input_dim, 600, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=args.baseline, naive=args.naive)
+            model = SymODEN_T(args.num_angle, H_net=nn_model, M_net=M_net, device=device, baseline=args.baseline, naive=args.naive)
         else:
             input_dim = 3 * args.num_angle
             output_dim = 1
             nn_model = MLP(input_dim, 500, output_dim, args.nonlinearity).to(device)
-            model = HNN_structure_embed(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=args.baseline, naive=args.naive)
+            model = SymODEN_T(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=args.baseline, naive=args.naive)
     elif args.structure == True and args.baseline ==False and args.naive==False:
         V_net = MLP(2*args.num_angle, 50, 1).to(device)
-        model = HNN_structure_embed(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
+        model = SymODEN_T(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
     else:
         raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
     
