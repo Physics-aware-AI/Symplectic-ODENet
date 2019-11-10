@@ -95,12 +95,13 @@ class SymODEN_T(torch.nn.Module):
     u is a tensor of size (bs, 1).
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None,
-            device=None, baseline=False, structure=False, naive=False):
+            device=None, baseline=False, structure=False, naive=False, u_dim=1):
         super(SymODEN_T, self).__init__()
         self.baseline = baseline
         self.structure = structure
         self.naive = naive
         self.M_net = M_net
+        self.u_dim = u_dim
         if self.structure:
             self.V_net = V_net
             self.g_net = g_net
@@ -116,12 +117,12 @@ class SymODEN_T(torch.nn.Module):
         with torch.enable_grad():
             self.nfe += 1
             bs = x.shape[0]
-            zero_vec = torch.zeros(bs, 1, dtype=torch.float32, device =self.device)
+            zero_vec = torch.zeros(bs, self.u_dim, dtype=torch.float32, device =self.device)
 
             if self.naive:
                 return torch.cat((self.H_net(x), zero_vec), dim=1)
 
-            cos_q_sin_q, q_dot, u = torch.split(x, [2*self.input_dim, 1*self.input_dim, 1], dim=1)
+            cos_q_sin_q, q_dot, u = torch.split(x, [2*self.input_dim, 1*self.input_dim, self.u_dim], dim=1)
             M_q_inv = self.M_net(cos_q_sin_q)
             if self.input_dim == 1:
                 p = q_dot / M_q_inv
@@ -151,8 +152,12 @@ class SymODEN_T(torch.nn.Module):
                 dH = torch.autograd.grad(H.sum(), cos_q_sin_q_p, create_graph=True)[0]
                 dHdcos_q, dHdsin_q, dHdp= torch.split(dH, [self.input_dim, self.input_dim, self.input_dim], dim=1)
                 g_q = self.g_net(cos_q_sin_q)
-                # broadcast multiply when angle is more than 1
-                F = g_q * u
+                
+                if self.u_dim == 1:
+                    # broadcast multiply when angle is more than 1
+                    F = g_q * u
+                else:
+                    F = torch.squeeze(torch.matmul(g_q, torch.unsqueeze(u, dim=2)))
 
                 dq = dHdp
                 dp = sin_q * dHdcos_q - cos_q * dHdsin_q + F
@@ -218,12 +223,13 @@ class SymODEN_R1_T1(torch.nn.Module):
     where x, cos q, sin q, x_dot, q_dot and u are all tensors of size (bs, 1)
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None,
-            device=None, baseline=False, structure=False, naive=False):
+            device=None, baseline=False, structure=False, naive=False, u_dim=1):
         super(SymODEN_R1_T1, self).__init__()
         self.baseline = baseline
         self.structure = structure
         self.naive = naive
         self.M_net = M_net
+        self.u_dim = u_dim
         if self.structure:
             self.V_net = V_net
             self.g_net = g_net
@@ -239,12 +245,12 @@ class SymODEN_R1_T1(torch.nn.Module):
         with torch.enable_grad():
             self.nfe += 1
             bs = y.shape[0]
-            zero_vec = torch.zeros(bs, 1, dtype=torch.float32, device =self.device)
+            zero_vec = torch.zeros(bs, self.u_dim, dtype=torch.float32, device =self.device)
 
             if self.naive:
                 return torch.cat((self.H_net(y), zero_vec), dim=1)
 
-            x_cos_q_sin_q, x_dot_q_dot, u = torch.split(y, [3, 2, 1], dim=1)
+            x_cos_q_sin_q, x_dot_q_dot, u = torch.split(y, [3, 2, self.u_dim], dim=1)
             M_q_inv = self.M_net(x_cos_q_sin_q)
 
             x_dot_q_dot_aug = torch.unsqueeze(x_dot_q_dot, dim=2)
@@ -268,10 +274,12 @@ class SymODEN_R1_T1(torch.nn.Module):
                 dH = torch.autograd.grad(H.sum(), x_cos_q_sin_q_p, create_graph=True)[0]
                 dHdx, dHdcos_q, dHdsin_q, dHdp= torch.split(dH, [1, 1, 1, 2], dim=1)
                 g_q = self.g_net(x_cos_q_sin_q)
-                # broadcast multiply when angle is more than 1
-                F = g_q * u
-                # F = 3*u
-                # F = u
+                
+                if self.u_dim == 1:
+                    # broadcast multiply when angle is more than 1
+                    F = g_q * u
+                else:
+                    F = torch.squeeze(torch.matmul(g_q, torch.unsqueeze(u, dim=2)))
 
                 dx, dq = torch.split(dHdp, [1, 1], dim=1)
                 dp_q = sin_q * dHdcos_q - cos_q * dHdsin_q

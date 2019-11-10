@@ -84,6 +84,18 @@ class PSD(torch.nn.Module):
             return D
 
 
+class MatrixNet(torch.nn.Module):
+    ''' a neural net which outputs a matrix'''
+    def __init__(self, input_dim, hidden_dim, output_dim, nonlinearity='tanh', bias_bool=True, shape=(2,2)):
+        super(MatrixNet, self).__init__()
+        self.mlp = MLP(input_dim, hidden_dim, output_dim, nonlinearity, bias_bool)
+        self.shape = shape
+
+    def forward(self, x):
+        flatten = self.mlp(x)
+        return flatten.view(-1, *self.shape)
+
+
 class DampMatrix(torch.nn.Module):
     '''(not used in the paper) A Neural Net which outputs a 2*2 damping matrix'''
     def __init__(self, input_dim, hidden_dim, diag_dim, device, nonlinearity='tanh'):
