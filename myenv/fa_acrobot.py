@@ -135,7 +135,7 @@ class AcrobotEnv(core.Env):
         # self.state = ns
         terminal = self._terminal()
         reward = -1. if not terminal else 0.
-        return (self._get_ob(), reward, terminal, {})
+        return (self._get_ob(), reward, False, {})
 
     def _get_ob(self):
         s = self.state
