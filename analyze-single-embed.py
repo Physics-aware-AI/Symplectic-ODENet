@@ -25,7 +25,7 @@ import imageio
 
 #%%
 DPI = 600
-FORMAT = 'png'
+FORMAT = 'pdf'
 
 def get_args():
     return {'num_angle': 1,
@@ -384,24 +384,28 @@ y_traj = torch.stack(y_traj).view(-1, 4).detach().cpu().numpy()
 fig = plt.figure(figsize=[10, 2.2], dpi=DPI)
 
 plt.subplot(1, 3, 1)
-plt.plot(t_eval.numpy(), y_traj[:, 1], 'k', label=r'$sin(q)$', linewidth=2)
-plt.plot(t_eval.numpy(), y_traj[:, 0], 'k--', label=r'$cos(q)$', linewidth=2)
+plt.plot(t_eval.numpy(), 1 * np.ones_like(t_eval.numpy()), 'k--', linewidth=0.5)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 1], 'b', label=r'$\sin(q)$', linewidth=2)
+plt.plot(t_eval.numpy(), y_traj[:, 0], 'b--', label=r'$\cos(q)$', linewidth=2)
 plt.title('$q$', fontsize=14)
 plt.xlabel('$t$', fontsize=14)
 plt.ylim([-1.1, 1.1])
 plt.legend(fontsize=10)
 
 plt.subplot(1, 3, 2)
-plt.plot(t_eval.numpy(), y_traj[:, 2], 'k', linewidth=2)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 2], 'b', linewidth=2)
 plt.title('$\dot{q}$', fontsize=14)
 plt.xlabel('$t$', fontsize=14)
 plt.ylim([-4.1, 4.1])
 
 plt.subplot(1, 3, 3)
-plt.plot(t_eval.numpy(), y_traj[:, 3], 'k', linewidth=2)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 3], 'b', linewidth=2)
 plt.title('$u$', fontsize=14)
 plt.xlabel('$t$', fontsize=14)
 plt.ylim([-10.1, 10.1])
 
 plt.tight_layout() ; plt.show()
-# fig.savefig('{}/fig-embed-ctrl.{}'.format(args.fig_dir, FORMAT))
+fig.savefig('{}/fig-embed-ctrl.{}'.format(args.fig_dir, FORMAT))
