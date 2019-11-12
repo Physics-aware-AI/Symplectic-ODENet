@@ -24,8 +24,8 @@ from utils import L2_loss, from_pickle
 import imageio
 
 #%%
-DPI = 300
-FORMAT = 'png'
+DPI = 600
+FORMAT = 'pdf'
 LINE_WIDTH = 2
 
 def get_args():
@@ -166,3 +166,102 @@ y_traj = torch.stack(y_traj).view(-1, 7).detach().cpu().numpy()
 
 
 # %%
+with plt.style.context("seaborn-white"):
+    fig = plt.figure(figsize=(12, 1.3), dpi=DPI)
+    plt.rcParams["axes.grid"] = False
+    ax = plt.subplot(1, 10, 1)
+    ax.imshow(frames[0])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 2)
+    ax.imshow(frames[15])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 3)
+    ax.imshow(frames[30])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 4)
+    ax.imshow(frames[45])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 5)
+    ax.imshow(frames[60])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 6)
+    ax.imshow(frames[75])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 7)
+    ax.imshow(frames[90])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 8)
+    ax.imshow(frames[105])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 9)
+    ax.imshow(frames[120])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+    ax = plt.subplot(1, 10, 10)
+    ax.imshow(frames[135])
+    plt.setp(ax.get_xticklabels(), visible=False)
+    plt.setp(ax.get_yticklabels(), visible=False)
+
+    plt.tight_layout()
+
+    fig.subplots_adjust(hspace=0, wspace=0)
+
+    fig.savefig('{}/fig-fa-cartpole-frame.{}'.format(args.fig_dir, FORMAT))
+
+
+
+# %%
+y_traj[0, 5] = y_traj[1, 5]
+y_traj[0, 6] = y_traj[1, 6]
+
+
+fig = plt.figure(figsize=[12, 4], dpi=DPI)
+plt.subplot(2, 3, 1)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), color='k', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 0], color='b', linewidth=LINE_WIDTH)
+plt.title("$r$", fontsize=14)
+plt.xlabel('t')
+
+plt.subplot(2, 3, 4)
+plt.plot(t_eval.numpy(), 1 * np.ones_like(t_eval.numpy()), 'k--', linewidth=0.5)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 1], 'b--', label=r"$\cos(\phi)$", linewidth=LINE_WIDTH)
+plt.plot(t_eval.numpy(), y_traj[:, 2], 'b-', label=r"$\sin(\phi)$", linewidth=LINE_WIDTH)
+plt.title("$\phi$", fontsize=14)
+plt.xlabel('t')
+plt.legend(fontsize=12)
+
+plt.subplot(2, 3, 2)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 3], color='b', linewidth=LINE_WIDTH)
+plt.title("$\dot{r}$", fontsize=14)
+plt.xlabel('t')
+
+plt.subplot(2, 3, 5)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 4], color='b', linewidth=LINE_WIDTH)
+plt.title("$\dot{\phi}$", fontsize=14)
+plt.xlabel('t')
+
+plt.subplot(2, 3, 3)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 5], color='b', linewidth=LINE_WIDTH)
+plt.title("$u_1$", fontsize=14)
+plt.xlabel('t')
+
+plt.subplot(2, 3, 6)
+plt.plot(t_eval.numpy(), 0 * np.ones_like(t_eval.numpy()), 'k-', linewidth=0.5)
+plt.plot(t_eval.numpy(), y_traj[:, 6], color='b', linewidth=LINE_WIDTH)
+plt.title("$u_2$", fontsize=14)
+plt.xlabel('t')
+
+plt.tight_layout()
+fig.savefig('{}/fig-fa-cartpole-ctrl.{}'.format(args.fig_dir, FORMAT))
