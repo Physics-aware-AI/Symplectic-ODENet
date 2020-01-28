@@ -47,6 +47,8 @@ args = ObjectView(get_args())
 
 #%% [markdown]
 # ## Load models
+
+#%%
 device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 'cpu')
 def get_model(args, baseline, structure, naive, num_points):
     M_net = PSD(3, 400, 2).to(device)
@@ -160,7 +162,7 @@ for i in range(len(t_eval)-1):
 
     y_traj.append(y)
 env.close()
-imageio.mimsave('./videos/cartpole-fa-embed/cartpole-fa-embed.gif', frames, duration=0.02)
+# imageio.mimsave('./videos/cartpole-fa-embed/cartpole-fa-embed.gif', frames, duration=0.02)
 
 y_traj = torch.stack(y_traj).view(-1, 7).detach().cpu().numpy()
 
@@ -214,7 +216,7 @@ with plt.style.context("seaborn-white"):
 
     fig.subplots_adjust(hspace=0, wspace=0)
 
-    fig.savefig('{}/fig-fa-cartpole-frame.{}'.format(args.fig_dir, FORMAT))
+    # fig.savefig('{}/fig-fa-cartpole-frame.{}'.format(args.fig_dir, FORMAT))
 
 
 
@@ -264,4 +266,4 @@ plt.title("$u_2$", fontsize=14)
 plt.xlabel('t')
 
 plt.tight_layout()
-fig.savefig('{}/fig-fa-cartpole-ctrl.{}'.format(args.fig_dir, FORMAT))
+# fig.savefig('{}/fig-fa-cartpole-ctrl.{}'.format(args.fig_dir, FORMAT))

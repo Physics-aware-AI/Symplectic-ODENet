@@ -148,7 +148,7 @@ for i in range(len(t_eval)-1):
     y_traj.append(y)
 
 env.close()
-imageio.mimsave('./videos/acrobot-fa/acrobot-fa.gif', frames, duration=0.02)
+# imageio.mimsave('./videos/acrobot-fa/acrobot-fa.gif', frames, duration=0.02)
 
 y_traj = torch.stack(y_traj).view(-1, 8).detach().cpu().numpy()
 
@@ -202,7 +202,7 @@ with plt.style.context("seaborn-white"):
 
     fig.subplots_adjust(hspace=0, wspace=0)
 
-    fig.savefig('{}/fig-fa-acrobot-frame.{}'.format(args.fig_dir, FORMAT))
+    # fig.savefig('{}/fig-fa-acrobot-frame.{}'.format(args.fig_dir, FORMAT))
 
 # %%
 y_traj[0, 6] = y_traj[1, 6]
@@ -253,6 +253,6 @@ plt.title("$u_2$", fontsize=14)
 plt.xlabel('t')
 
 plt.tight_layout()
-fig.savefig('{}/fig-fa-acrobot-ctrl.{}'.format(args.fig_dir, FORMAT))
+# fig.savefig('{}/fig-fa-acrobot-ctrl.{}'.format(args.fig_dir, FORMAT))
 
 # %%

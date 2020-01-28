@@ -408,4 +408,7 @@ plt.xlabel('$t$', fontsize=14)
 plt.ylim([-10.1, 10.1])
 
 plt.tight_layout() ; plt.show()
-fig.savefig('{}/fig-embed-ctrl.{}'.format(args.fig_dir, FORMAT))
+# fig.savefig('{}/fig-embed-ctrl.{}'.format(args.fig_dir, FORMAT))
+
+
+# %%
