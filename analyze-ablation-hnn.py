@@ -30,7 +30,7 @@ device = torch.device('cuda:' + str(args.gpu) if torch.cuda.is_available() else 
 
 #%%
 DPI = 600
-FORMAT = 'png'
+FORMAT = 'pdf'
 LINE_SEGMENTS = 10
 ARROW_SCALE = 40
 ARROW_WIDTH = 6e-3
@@ -280,7 +280,7 @@ plt.plot(t_eval, ((true_x[:,0:2]-hnn_rad_x)**2).mean(-1), 'c--', linewidth=2)
 plt.ylim(-0.5, 10)
 plt.xlabel('t')
 # plt.ylabel('MSE')
-plt.title('MSE w/ HNN training data')
+plt.title('MSE w/ annulus training data')
 
 plt.subplot(1, 4, 2)
 plt.plot(t_eval, E_true, 'k', label='Ground Truth', linewidth=2)
@@ -288,7 +288,7 @@ plt.plot(t_eval, E_symoden_rad, 'b', label='Unstructured SymODEN', linewidth=2)
 plt.plot(t_eval, E_hnn_rad, 'c--', label='HNN', linewidth=2)
 plt.ylim(0, 9)
 plt.xlabel('t')
-plt.title('Total Energy w/ HNN training data')
+plt.title('Total Energy w/ annulus training data')
 plt.legend(fontsize=10)
 
 
@@ -298,7 +298,7 @@ plt.plot(t_eval, ((true_x[:,0:2]-hnn_x)**2).mean(-1), 'c--', linewidth=2)
 plt.ylim(-0.5, 10)
 plt.xlabel('t')
 # plt.ylabel('MSE')
-plt.title('MSE w/ uniform training data')
+plt.title('MSE w/ rectangle training data')
 
 plt.subplot(1, 4, 4)
 plt.plot(t_eval, E_true, 'k', label='Ground Truth', linewidth=2)
@@ -306,7 +306,7 @@ plt.plot(t_eval, E_symoden, 'b', label='Unstructured SymODEN', linewidth=2)
 plt.plot(t_eval, E_hnn, 'c--', label='HNN', linewidth=2)
 plt.ylim(0, 9)
 plt.xlabel('t')
-plt.title('Total Energy w/ uniform training data')
+plt.title('Total Energy w/ rectangle training data')
 
 plt.tight_layout()
 # fig.savefig('{}/fig-ablation-hnn.{}'.format(args.fig_dir, FORMAT))
