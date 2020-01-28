@@ -1,43 +1,45 @@
-# Symplectic ODE-Net: Learning Hamiltonian Dynamics with Control
+# Symplectic ODE-Net
 Yaofeng Desmond Zhong, Biswadip Dey, Amit Chakraborty | 2019
 
-- Paper: [on Arxiv](https://arxiv.org/abs/1909.12077), [on OpenReview (ICLR2020)](https://openreview.net/forum?id=ryxmb1rKDS)
+_TL;DR_: This work enforces Hamiltonian dynamics with control to learn system models from embedded position and velocity data, and exploits this physically-consistent dynamics to synthesize model-based control via energy shaping.
+
+- __Symplectic ODE-Net: Learning Hamiltonian Dynamics with Control__. _Y. D. Zhong, B. Dey, and A. Chakraborty_. To be presented at the International Conference on Learning Representations (ICLR 2020) [[OpenReview]](https://openreview.net/forum?id=ryxmb1rKDS) [[Arxiv]](https://arxiv.org/abs/1909.12077)
 
 ## Summary
-Symplectic ODE-Net (SymODEN) is a deep learning framework which can infer the dynamics of a physical system from observed state trajectories. To achieve better generalization with fewer training samples, SymODEN incorporates appropriate inductive bias by designing the associated computation graph in a physics-informed manner. In particular, we enforce Hamiltonian dynamics with control to learn the underlying dynamics in a transparent way which can then be leveraged to draw insight about relevant physical aspects of the system, such as mass and potential energy. In addition, we propose a parametrization which can enforce this Hamiltonian formalism even when the generalized coordinate data is embedded in a high-dimensional space or we can only access velocity data instead of generalized momentum. This framework, by offering interpretable, physically-consistent models for physical systems, opens up new possibilities for synthesizing model-based control strategies. 
+Symplectic ODE-Net (SymODEN) is an end-to-end learning framework which can infer the dynamics of a physical system from observed state trajectories. To achieve better generalization with fewer training samples, SymODEN incorporates appropriate inductive bias by designing the associated computation graph in a physics-informed manner. In particular, we enforce Hamiltonian dynamics with control to learn the underlying dynamics in a transparent way which can then be leveraged to draw insight about relevant physical aspects of the system, such as mass and potential energy. In addition, we propose a parametrization which can enforce this Hamiltonian formalism even when the generalized coordinate data is embedded in a high-dimensional space or we can only access velocity data instead of generalized momentum. This framework, by offering interpretable, physically-consistent models for physical systems, opens up new possibilities for synthesizing model-based control strategies. 
 
 ## Performance
 ![](./figures/fig-train-pred-loss.png)
-**The variation in training error and prediction error with changes in the number of state initial conditions in the training set.**  We can see that SymODEN yields better generalization in all the tasks.  In Task 3, although the Geometric Baseline Model beats the other ones in terms of training error,  SymODEN generates more accurate predictions,  indicating overfitting in the Geometric Baseline Model.  By incorporating the physics-based prior of Hamiltonian dynamics, SymODEN learns dynamics that obey physical law and thus performs better in prediction.  In most cases, SymODEN trained with less training data beats other models with more training data in terms of training error and prediction error, indicating that better generalization can be achieved with fewer training samples.
+**_The variation in training error and prediction error with changes in the number of initial state conditions in the training set_.**  We can see that SymODEN yields better generalization in all the tasks.  In Task 3, although the Geometric Baseline Model beats the other ones in terms of training error,  SymODEN generates more accurate predictions,  indicating overfitting in the Geometric Baseline Model.  By incorporating the physics-based prior of Hamiltonian dynamics, SymODEN learns dynamics that obey physical law and thus performs better in prediction.  In most cases, SymODEN trained with less training data beats other models with more training data in terms of training error and prediction error, indicating that better generalization can be achieved with fewer training samples.
 
 ![](./figures/fig-MSE-energy.png)
-**The MSE and the total energy evolves along a trajectory with a previously unseen initial condition.** For all the tasks, the MSE of the baseline models diverge faster than SymODEN. The Unstructured SymODEN works well in Task 1, Task 2 and Task 4 but not so well in Task 3.  As for the total energy, in the two pendulum tasks, SymODEN and Unstructured SymODEN conserve total energy by oscillating around a constant value. In these models, the Hamiltonian itself is learnt and the prediction of the future states stay around a level set of the Hamiltonian. Baseline models, however, fail to find the conservation and the estimation of future states drift away from the initial Hamiltonian level set.
+**_The evolution of MSE and the total energy along a trajectory with a previously unseen initial condition_.** For all the tasks, the MSE predicted by the baseline models diverges faster than the prediction from SymODEN. The Unstructured SymODEN works well in Task 1, Task 2 and Task 4 but not so well in Task 3.  As for the total energy, in the two pendulum tasks, SymODEN and Unstructured SymODEN conserve total energy by oscillating around a constant value. In these models, the Hamiltonian itself is learnt and the prediction of the future states stay around a level set of the Hamiltonian. Baseline models, however, fail to find the conservation and the estimation of future states drift away from the initial Hamiltonian level set.
 
-## Control Based on Learnt Dynamics
-**Task 2: Pendulum(embed):** We train the model using data generated by OpenAI Gym. We modify the action space to allow large actions and change the numerical scheme of the simulator to RK4. After learning the dynamics, an energy-based controller is designed to control the pendulum to the inverted position. 
+## Energy-shaping Control Based on Learnt Dynamics
+**Task 2: Pendulum (embed):** We train the model using data generated by OpenAI Gym. We modify the action space to allow large actions and change the numerical scheme of the simulator to RK4. After learning the dynamics, an energy-based controller is designed to stabilize the pendulum at the inverted position. 
 
 <img src="./videos/single-embed/single-embed.gif" alt="drawing" width="250"/>
 <img src="./figures/fig-embed-ctrl.png" alt="drawing" width="700"/>
 
-Here is the rendering of a trajectory and how the state variables and the action (control input) change with time. Black reference lines indicate expected value in the end. 
+Here is the rendering of a trajectory and how the state variables and the action (control input) change with time. Black reference lines indicate the desired values in the end. 
 
 --------------
 
-**Task 5: Fully-actuated CartPole:** We train SymODEN on fully-actuated CartPole. We modify the action space to allow large control on both the position of the cart and the angle of the pendulum. As before, we change the numerical scheme of the simulator to RK4. With learnt dynamics, an energy-based controller is designed to control the pendulum to the upright position and the cart to the center. 
+**Task 5: Fully-actuated CartPole:** We train SymODEN on fully-actuated CartPole. We modify the action space to allow large control on both the position of the cart and the angle of the pendulum. As before, we change the numerical scheme of the simulator to RK4. With learnt dynamics, an energy-based controller is designed to stabilize the pendulum at the upright position and the cart at the center. 
 
 <img src="./videos/cartpole-fa-embed/cartpole-fa-embed.gif" alt="drawing" width="300"/>
 <img src="./figures/fig-fa-cartpole-ctrl.png" alt="drawing" width="700"/>
 
-Here is the rendering of a trajectory and how the state variables and the action (control input) change with time. Black reference lines indicate expected value in the end. 
+Here is the rendering of a trajectory and how the state variables and the action (control input) change with time. Black reference lines indicate the desired values in the end. 
 
 -------------
 
-**Task 6: Fully-actuated Acrobot:** We train SymODEN on fully-actuated Acrobot. We modify the action space to allow large control on both angles and change the numerical scheme of the simulator to RK4. With the learnt dynamics, an energy-based controller is designed to control the acrobot to the upright position.
+**Task 6: Fully-actuated Acrobot:** We train SymODEN on fully-actuated Acrobot. We modify the action space to allow large control on both angles and change the numerical scheme of the simulator to RK4. With the learnt dynamics, an energy-based controller is designed to stabilize the acrobot to the upright position.
 
 <img src="./videos/acrobot-fa/acrobot-fa.gif" alt="drawing" width="250"/>
 <img src="./figures/fig-fa-acrobot-ctrl.png" alt="drawing" width="700"/>
 
-Here is the rendering of a trajectory and how the state variables and the action (control input) change with time. Black reference lines indicate expected value in the end. 
+Here is the rendering of a trajectory and how the state variables and the action (control input) change with time. Black reference lines indicate the desired values in the end. 
 
 ## Basic Usage
 To train Symplectic ODE-Net(SymODEN):
