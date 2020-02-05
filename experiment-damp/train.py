@@ -60,18 +60,18 @@ def train(args):
         print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver))
     
     if args.structure == False and args.baseline == True:
-        nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity).to(device)    
-        model = SymODEN_R(args.input_dim, H_net=nn_model, device=device, baseline=True)
+        nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity)
+        model = SymODEN_R(args.input_dim, H_net=nn_model, device=device, baseline=True).to(device)
     elif args.structure == False and args.baseline == False:
         damp_net = PSD(int(args.input_dim/2), 100, int(args.input_dim/2), eps=0.0)
-        H_net = MLP(args.input_dim, 400, 1, args.nonlinearity).to(device)
-        g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2)).to(device)
-        model = SymODEN_R(args.input_dim, H_net=H_net, g_net=g_net, device=device, baseline=False, damp_net=damp_net)
+        H_net = MLP(args.input_dim, 400, 1, args.nonlinearity)
+        g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2))
+        model = SymODEN_R(args.input_dim, H_net=H_net, g_net=g_net, device=device, baseline=False, damp_net=damp_net).to(device)
     elif args.structure == True and args.baseline ==False:
         damp_net = PSD(int(args.input_dim/2), 100, int(args.input_dim/2), eps=0.0)
         M_net = MLP(int(args.input_dim/2), 300, int(args.input_dim/2))
-        V_net = MLP(int(args.input_dim/2), 50, 1).to(device)
-        g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2)).to(device)
+        V_net = MLP(int(args.input_dim/2), 50, 1)
+        g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2))
         model = SymODEN_R(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=False, structure=True, damp_net=damp_net).to(device)
     else:
         raise RuntimeError('argument *baseline* and *structure* cannot both be true')
