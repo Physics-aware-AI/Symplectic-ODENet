@@ -15,7 +15,7 @@ class SymODEN_R(torch.nn.Module):
     where q and p are tensors of size (bs, n) and u is a tensor of size (bs, 1)
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None, device=None,
-                    assume_canonical_coords=True, baseline=False, structure=False):
+                    assume_canonical_coords=True, baseline=False, structure=False, damp_net=None):
         super(SymODEN_R, self).__init__()
         self.baseline = baseline
         self.structure = structure
@@ -32,6 +32,7 @@ class SymODEN_R(torch.nn.Module):
         self.M = self.permutation_tensor(input_dim)
         self.nfe = 0
         self.input_dim = input_dim
+        self.damp_net = damp_net
 
     def forward(self, t, x):
         with torch.enable_grad():
@@ -40,12 +41,11 @@ class SymODEN_R(torch.nn.Module):
             self.nfe += 1
             bs = x.shape[0]
             zero_vec = torch.zeros(bs, 1, dtype=torch.float32, device =self.device)
-            q, p, u = torch.chunk(x, 3, dim=1)
+            q, p, u = torch.split(x, [self.input_dim, self.input_dim, 1], dim=1)
             q_p = torch.cat((q,p), dim=1)
             if self.baseline:
-
                 dq, dp=  torch.chunk(self.H_net(q_p), 2, dim=1)
-                return torch.cat((dq, dp, zero_vec), dim=1)
+                return torch.cat((dq, dp, zero_vec), dim=1) # damping doesn't affect this term
             if self.structure:
                 q, p = torch.chunk(q_p, 2, dim=1)
                 V_q = self.V_net(q)
@@ -66,6 +66,10 @@ class SymODEN_R(torch.nn.Module):
 
             F = g_q * u
             F_vector_field = torch.cat((torch.zeros_like(F), F, zero_vec), dim=1)
+            if not self.damp_net:
+                D_vector_field = torch.matmul(dH, self.damp_net) # should be self.damp_net transpose, but symmetric
+                D_vector_field = torch.cat((D_vector_field, zero_vec), dim=1)
+                return H_vector_field + F_vector_field - D_vector_field
 
             return H_vector_field + F_vector_field
 

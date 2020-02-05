@@ -30,9 +30,10 @@ class MLP(torch.nn.Module):
 
 class PSD(torch.nn.Module):
     '''A Neural Net which outputs a positive semi-definite matrix'''
-    def __init__(self, input_dim, hidden_dim, diag_dim, nonlinearity='tanh'):
+    def __init__(self, input_dim, hidden_dim, diag_dim, nonlinearity='tanh', eps=0.1):
         super(PSD, self).__init__()
         self.diag_dim = diag_dim
+        self.eps = eps
         if diag_dim == 1:
             self.linear1 = torch.nn.Linear(input_dim, hidden_dim)
             self.linear2 = torch.nn.Linear(hidden_dim, hidden_dim)
@@ -61,7 +62,7 @@ class PSD(torch.nn.Module):
             h = self.nonlinearity( self.linear1(q) )
             h = self.nonlinearity( self.linear2(h) )
             h = self.nonlinearity( self.linear3(h) )
-            return h*h + 0.1
+            return h*h + self.eps
         else:
             bs = q.shape[0]
             h = self.nonlinearity( self.linear1(q) )
@@ -79,8 +80,8 @@ class PSD(torch.nn.Module):
             L = torch.reshape(L, (bs, self.diag_dim, self.diag_dim))
 
             D = torch.bmm(L, L.permute(0, 2, 1))
-            D[:, 0, 0] = D[:, 0, 0] + 0.1
-            D[:, 1, 1] = D[:, 1, 1] + 0.1
+            for i in range(self.diag_dim):
+                D[:, i, i] = D[:, i, i] + self.eps
             return D
 
 
