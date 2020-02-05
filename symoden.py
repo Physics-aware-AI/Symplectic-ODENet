@@ -41,7 +41,7 @@ class SymODEN_R(torch.nn.Module):
             self.nfe += 1
             bs = x.shape[0]
             zero_vec = torch.zeros(bs, 1, dtype=torch.float32, device =self.device)
-            q, p, u = torch.split(x, [self.input_dim, self.input_dim, 1], dim=1)
+            q, p, u = torch.split(x, [self.input_dim//2, self.input_dim//2, 1], dim=1)
             q_p = torch.cat((q,p), dim=1)
             if self.baseline:
                 dq, dp=  torch.chunk(self.H_net(q_p), 2, dim=1)
