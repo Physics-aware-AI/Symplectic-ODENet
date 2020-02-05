@@ -32,7 +32,7 @@ def get_args():
     parser.add_argument('--seed', default=0, type=int, help='random seed')
     parser.add_argument('--save_dir', default=THIS_DIR, type=str, help='where to save the trained model')
     parser.add_argument('--gpu', type=int, default=0)
-    parser.add_argument('--num_points', type=int, default=2, help='number of evaluation points by the ODE solver, including the initial point')
+    parser.add_argument('--num_points', type=int, default=4, help='number of evaluation points by the ODE solver, including the initial point')
     parser.add_argument('--structure', dest='structure', action='store_true', help='using a structured Hamiltonian')
     parser.add_argument('--rad', dest='rad', action='store_true', help='generate random data around a radius')
     parser.add_argument('--solver', default='rk4', type=str, help='type of ODE Solver for Neural ODE')
@@ -58,7 +58,7 @@ def train(args):
     # init model and optimizer
     if args.verbose:
         print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver))
-    
+
     if args.structure == False and args.baseline == True:
         nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity)
         model = SymODEN_R(args.input_dim, H_net=nn_model, device=device, baseline=True).to(device)
@@ -85,11 +85,11 @@ def train(args):
     us = [-2.0, -1.0, 0.0, 1.0, 2.0]
     # us = [0.0]
     data = get_dataset(seed=args.seed, timesteps=45,
-                    save_dir=args.save_dir, rad=args.rad, us=us, samples=50) 
+                    save_dir=args.save_dir, rad=args.rad, us=us, samples=128)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)
 
-    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device) 
+    train_x = torch.tensor(train_x, requires_grad=True, dtype=torch.float32).to(device)
     test_x = torch.tensor(test_x, requires_grad=True, dtype=torch.float32).to(device)
     t_eval = torch.tensor(t_eval, requires_grad=True, dtype=torch.float32).to(device)
 
@@ -99,9 +99,9 @@ def train(args):
         train_loss = 0
         test_loss = 0
         for i in range(train_x.shape[0]):
-            
+
             t = time.time()
-            train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver)            
+            train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver)
             forward_time = time.time() - t
             train_loss_mini = L2_loss(train_x[i,:,:,:], train_x_hat)
             train_loss = train_loss + train_loss_mini
@@ -135,7 +135,7 @@ def train(args):
     train_loss = []
     test_loss = []
     for i in range(train_x.shape[0]):
-        train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver)            
+        train_x_hat = odeint(model, train_x[i, 0, :, :], t_eval, method=args.solver)
         train_loss.append((train_x[i,:,:,:] - train_x_hat)**2)
 
         # run test data
@@ -162,7 +162,7 @@ if __name__ == "__main__":
     args = get_args()
     model, stats = train(args)
 
-    # save 
+    # save
     os.makedirs(args.save_dir) if not os.path.exists(args.save_dir) else None
     label = '-baseline_ode' if args.baseline else '-hnn_ode'
     struct = '-struct' if args.structure else ''

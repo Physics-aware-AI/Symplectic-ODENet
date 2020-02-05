@@ -15,7 +15,7 @@ def hamiltonian_fn(coords):
 def dynamics_fn(t, coords, u=0):
     dcoords = autograd.grad(hamiltonian_fn)(coords)
     dqdt, dpdt = np.split(dcoords,2)
-    d = 0.2
+    d = 0.1
     S = np.concatenate([dpdt, -dqdt - d * coords[1] + u], axis=-1)
     return S
 
@@ -32,7 +32,7 @@ def get_trajectory(timesteps=20, radius=None, y0=None, noise_std=0.1, u=0.0, rad
         y0 = y0 / np.sqrt((y0**2).sum()) * radius ## set the appropriate radius
     else:
         if y0 is None:
-            y0 = np.random.rand(2) * 3 * np.pi - np.pi       
+            y0 = np.random.rand(2) * 3 * np.pi - np.pi
 
     # y0 = (np.random.rand(2) - 0.5) * 5
 
@@ -47,7 +47,7 @@ def get_trajectory(timesteps=20, radius=None, y0=None, noise_std=0.1, u=0.0, rad
 
 def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us=[0], rad=False, timesteps=20, **kwargs):
     data = {}
-   
+
     xs_force = []
     for u in us:
         xs = []
@@ -56,7 +56,7 @@ def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us
             q, p, t = get_trajectory(noise_std=0.0, u=u, rad=rad, timesteps=timesteps, **kwargs)
             xs.append(np.stack((q, p, np.ones_like(q)*u), axis=1)) # (45, 3) last dimension is u
         xs_force.append(np.stack(xs, axis=1)) # fit Neural ODE format (45, 50, 3)
-        
+
     data['x'] = np.stack(xs_force, axis=0) # (3, 45, 50, 3)
 
     # make a train/test split
@@ -66,7 +66,7 @@ def get_dataset(seed=0, samples=50, test_split=0.5, gym=False, save_dir=None, us
 
     data = split_data
     data['t'] = t
-    
+
     return data
 
 def arrange_data(x, t, num_points=2):
@@ -79,7 +79,7 @@ def arrange_data(x, t, num_points=2):
         else:
             x_stack.append(x[:, i:,:,:])
     x_stack = np.stack(x_stack, axis=1)
-    x_stack = np.reshape(x_stack, 
+    x_stack = np.reshape(x_stack,
                 (x.shape[0], num_points, -1, x.shape[3]))
     t_eval = t[0:num_points]
     return x_stack, t_eval
@@ -91,7 +91,7 @@ def get_field(xmin=-1.2, xmax=1.2, ymin=-1.2, ymax=1.2, gridsize=20, u=0):
     # meshgrid to get vector field
     b, a = np.meshgrid(np.linspace(xmin, xmax, gridsize), np.linspace(ymin, ymax, gridsize))
     ys = np.stack([b.flatten(), a.flatten()])
-    
+
     # get vector directions
     dydt = [dynamics_fn(None, y, u) for y in ys.T]
     dydt = np.stack(dydt).T
