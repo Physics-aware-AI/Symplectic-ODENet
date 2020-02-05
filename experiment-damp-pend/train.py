@@ -63,12 +63,12 @@ def train(args):
         nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity)
         model = SymODEN_R(args.input_dim, H_net=nn_model, device=device, baseline=True).to(device)
     elif args.structure == False and args.baseline == False:
-        damp_net = PSD(int(args.input_dim/2), 100, int(args.input_dim/2), eps=0.0)
+        damp_net = PSD(int(args.input_dim/2), 100, args.input_dim, eps=0.0)
         H_net = MLP(args.input_dim, 400, 1, args.nonlinearity)
         g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2))
         model = SymODEN_R(args.input_dim, H_net=H_net, g_net=g_net, device=device, baseline=False, damp_net=damp_net).to(device)
     elif args.structure == True and args.baseline ==False:
-        damp_net = PSD(int(args.input_dim/2), 100, int(args.input_dim/2), eps=0.0)
+        damp_net = PSD(int(args.input_dim/2), 100, args.input_dim, eps=0.0)
         M_net = MLP(int(args.input_dim/2), 300, int(args.input_dim/2))
         V_net = MLP(int(args.input_dim/2), 50, 1)
         g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2))
@@ -84,7 +84,7 @@ def train(args):
     # arrange data
     us = [-2.0, -1.0, 0.0, 1.0, 2.0]
     # us = [0.0]
-    data = get_dataset(seed=args.seed, timesteps=45,
+    data = get_dataset(seed=args.seed, timesteps=20,
                     save_dir=args.save_dir, rad=args.rad, us=us, samples=128)
     train_x, t_eval = arrange_data(data['x'], data['t'], num_points=args.num_points)
     test_x, t_eval = arrange_data(data['test_x'], data['t'], num_points=args.num_points)

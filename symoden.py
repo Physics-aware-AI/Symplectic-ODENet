@@ -66,8 +66,8 @@ class SymODEN_R(torch.nn.Module):
 
             F = g_q * u
             F_vector_field = torch.cat((torch.zeros_like(F), F, zero_vec), dim=1)
-            if not self.damp_net:
-                D_vector_field = torch.matmul(dH, self.damp_net) # should be self.damp_net transpose, but symmetric
+            if self.damp_net:
+                D_vector_field = torch.squeeze(torch.matmul(dH.unsqueeze(1), self.damp_net(q))) # should be self.damp_net transpose, but symmetric
                 D_vector_field = torch.cat((D_vector_field, zero_vec), dim=1)
                 return H_vector_field + F_vector_field - D_vector_field
 
@@ -99,7 +99,7 @@ class SymODEN_T(torch.nn.Module):
     u is a tensor of size (bs, 1).
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None,
-            device=None, baseline=False, structure=False, naive=False, u_dim=1):
+            device=None, baseline=False, structure=False, naive=False, u_dim=1, damp_net=None):
         super(SymODEN_T, self).__init__()
         self.baseline = baseline
         self.structure = structure
@@ -116,6 +116,7 @@ class SymODEN_T(torch.nn.Module):
         self.device = device
         self.nfe = 0
         self.input_dim = input_dim
+        self.damp_net = damp_net
 
     def forward(self, t, x):
         with torch.enable_grad():
@@ -124,7 +125,7 @@ class SymODEN_T(torch.nn.Module):
             zero_vec = torch.zeros(bs, self.u_dim, dtype=torch.float32, device =self.device)
 
             if self.naive:
-                return torch.cat((self.H_net(x), zero_vec), dim=1)
+                return torch.cat((self.H_net(x), zero_vec), dim=1) # damping won't affect naive baseline
 
             cos_q_sin_q, q_dot, u = torch.split(x, [2*self.input_dim, 1*self.input_dim, self.u_dim], dim=1)
             M_q_inv = self.M_net(cos_q_sin_q)
@@ -142,7 +143,7 @@ class SymODEN_T(torch.nn.Module):
             # M_q_inv = 3 * torch.ones_like(u)
 
             if self.baseline:
-                dq, dp=  torch.chunk(self.H_net(x), 2, dim=1)
+                dq, dp=  torch.chunk(self.H_net(x), 2, dim=1) # damping won't affect the term in baseline model
             else:
                 if self.structure:
                     V_q = self.V_net(cos_q_sin_q)   
@@ -163,8 +164,15 @@ class SymODEN_T(torch.nn.Module):
                 else:
                     F = torch.squeeze(torch.matmul(g_q, torch.unsqueeze(u, dim=2)))
 
-                dq = dHdp
-                dp = sin_q * dHdcos_q - cos_q * dHdsin_q + F
+                dHdq = - sin_q * dHdcos_q + cos_q * dHdsin_q
+                if self.damp_net:
+                    D_vector_field = torch.matmul(torch.cat((dHdq, dHdp), dim=1), self.damp_net) # should be self.damp_net transpose, but symmetric
+                    D_vector_field_q, D_vector_field_p = D_vector_field.chunk(2, dim=1)
+                    dq = dHdp - D_vector_field_q
+                    dp = -dHdq + F - D_vector_field_p
+                else:
+                    dq = dHdp
+                    dp = -dHdq + F
 
             if self.input_dim==1:
                 dM_inv = torch.autograd.grad(M_q_inv.sum(), cos_q_sin_q, create_graph=True)[0]
@@ -227,7 +235,7 @@ class SymODEN_R1_T1(torch.nn.Module):
     where x, cos q, sin q, x_dot, q_dot and u are all tensors of size (bs, 1)
     '''
     def __init__(self, input_dim, H_net=None, M_net=None, V_net=None, g_net=None,
-            device=None, baseline=False, structure=False, naive=False, u_dim=1):
+            device=None, baseline=False, structure=False, naive=False, u_dim=1, damp_net=None):
         super(SymODEN_R1_T1, self).__init__()
         self.baseline = baseline
         self.structure = structure
@@ -244,6 +252,7 @@ class SymODEN_R1_T1(torch.nn.Module):
         self.device = device
         self.nfe = 0
         self.input_dim = input_dim
+        self.damp_net = damp_net
 
     def forward(self, t, y):
         with torch.enable_grad():
@@ -252,7 +261,7 @@ class SymODEN_R1_T1(torch.nn.Module):
             zero_vec = torch.zeros(bs, self.u_dim, dtype=torch.float32, device =self.device)
 
             if self.naive:
-                return torch.cat((self.H_net(y), zero_vec), dim=1)
+                return torch.cat((self.H_net(y), zero_vec), dim=1) # damping won't affect naive model
 
             x_cos_q_sin_q, x_dot_q_dot, u = torch.split(y, [3, 2, self.u_dim], dim=1)
             M_q_inv = self.M_net(x_cos_q_sin_q)
@@ -267,7 +276,7 @@ class SymODEN_R1_T1(torch.nn.Module):
             # M_q_inv = 3 * torch.ones_like(u)
 
             if self.baseline:
-                dx, dq, dp=  torch.split(self.H_net(y), [1, 1, 2], dim=1)
+                dx, dq, dp=  torch.split(self.H_net(y), [1, 1, 2], dim=1) # damping won't affect baseline model
             else:
                 if self.structure:
                     V_q = self.V_net(x_cos_q_sin_q)   
@@ -285,10 +294,18 @@ class SymODEN_R1_T1(torch.nn.Module):
                 else:
                     F = torch.squeeze(torch.matmul(g_q, torch.unsqueeze(u, dim=2)))
 
-                dx, dq = torch.split(dHdp, [1, 1], dim=1)
-                dp_q = sin_q * dHdcos_q - cos_q * dHdsin_q
+                dHdq = - sin_q * dHdcos_q + cos_q * dHdsin_q
+                dp_q = - dHdq
                 dp_x = - dHdx
-                dp = torch.cat((dp_x, dp_q), dim=1) + F
+                
+                if not self.damp_net:
+                    D_vector_field = torch.matmul(torch.cat((dHdx, dHdq, dHdp), dim=1), self.damp_net) # should be self.damp_net transpose, but symmetric
+                    D_vector_field_xq, D_vector_field_p = torch.split(D_vector_field, [2, 2], dim=1)
+                    dx, dq = torch.split(dHdp - D_vector_field_xq, [1, 1], dim=1)
+                    dp = torch.cat((dp_x, dp_q), dim=1) + F - D_vector_field_p
+                else:
+                    dx, dq = torch.split(dHdp, [1, 1], dim=1)
+                    dp = torch.cat((dp_x, dp_q), dim=1) + F
 
 
             dM_inv_dt = torch.zeros_like(M_q_inv)
