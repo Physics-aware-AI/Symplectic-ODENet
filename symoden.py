@@ -67,7 +67,7 @@ class SymODEN_R(torch.nn.Module):
             F = g_q * u
             F_vector_field = torch.cat((torch.zeros_like(F), F, zero_vec), dim=1)
             if self.damp_net:
-                D_vector_field = torch.squeeze(torch.matmul(dH.unsqueeze(1), self.damp_net(q))) # should be self.damp_net transpose, but symmetric
+                D_vector_field = torch.squeeze(torch.matmul(dH.unsqueeze(1), self.damp_net(q)), dim=1) # should be self.damp_net transpose, but symmetric
                 D_vector_field = torch.cat((D_vector_field, zero_vec), dim=1)
                 return H_vector_field + F_vector_field - D_vector_field
 
@@ -166,7 +166,11 @@ class SymODEN_T(torch.nn.Module):
 
                 dHdq = - sin_q * dHdcos_q + cos_q * dHdsin_q
                 if self.damp_net:
-                    D_vector_field = torch.matmul(torch.cat((dHdq, dHdp), dim=1), self.damp_net) # should be self.damp_net transpose, but symmetric
+                    D_vector_field = torch.squeeze(
+                        torch.matmul(
+                            torch.unsqueeze(torch.cat((dHdq, dHdp), dim=1), dim=1), self.damp_net(cos_q_sin_q)
+                            ) # should be self.damp_net transpose, but symmetric
+                        , dim=1)
                     D_vector_field_q, D_vector_field_p = D_vector_field.chunk(2, dim=1)
                     dq = dHdp - D_vector_field_q
                     dp = -dHdq + F - D_vector_field_p
@@ -298,7 +302,7 @@ class SymODEN_R1_T1(torch.nn.Module):
                 dp_q = - dHdq
                 dp_x = - dHdx
                 
-                if not self.damp_net:
+                if self.damp_net:
                     D_vector_field = torch.matmul(torch.cat((dHdx, dHdq, dHdp), dim=1), self.damp_net) # should be self.damp_net transpose, but symmetric
                     D_vector_field_xq, D_vector_field_p = torch.split(D_vector_field, [2, 2], dim=1)
                     dx, dq = torch.split(dHdp - D_vector_field_xq, [1, 1], dim=1)
