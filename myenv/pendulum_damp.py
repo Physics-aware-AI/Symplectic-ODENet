@@ -36,7 +36,7 @@ class PendulumEnv(gym.Env):
         g = self.g
         m = 1.
         l = 1.
-        d = 0.2
+        d = 0.3
 
         f = np.zeros_like(y)
         f[0] = y[1]

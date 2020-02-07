@@ -36,6 +36,7 @@ def get_args():
     parser.add_argument('--structure', dest='structure', action='store_true', help='using a structured Hamiltonian')
     parser.add_argument('--naive', dest='naive', action='store_true', help='use a naive baseline')
     parser.add_argument('--solver', default='rk4', type=str, help='type of ODE Solver for Neural ODE')
+    parser.add_argument('--no_damp', dest='no_damp', action='store_true', help='standard SymODEN, without damping')
     parser.set_defaults(feature=True)
     return parser.parse_args()
 
@@ -62,7 +63,7 @@ def train(args):
 
     M_net = PSD(2*args.num_angle, 300, args.num_angle).to(device)
     g_net = MLP(2*args.num_angle, 200, args.num_angle).to(device)
-    if args.structure == False:
+    if args.structure == False and args.no_damp == False:
         if args.naive and args.baseline:
             raise RuntimeError('argument *baseline* and *naive* cannot both be true')
         elif args.naive:
@@ -83,10 +84,13 @@ def train(args):
             model = SymODEN_T(args.num_angle, H_net=nn_model, M_net=M_net, g_net=g_net, device=device, baseline=args.baseline, naive=args.naive, damp_net=damp_net).to(device)
     elif args.structure == True and args.baseline ==False and args.naive==False:
         V_net = MLP(2*args.num_angle, 50, 1)
-        damp_net = PSD(2*args.num_angle, 100, 2*args.num_angle, eps=0.0)
-        model = SymODEN_T(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True, damp_net=damp_net).to(device)
+        if args.no_damp:
+            model = SymODEN_T(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True).to(device)
+        else:
+            damp_net = PSD(2*args.num_angle, 100, 2*args.num_angle, eps=0.0)
+            model = SymODEN_T(args.num_angle, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=args.baseline, structure=True, damp_net=damp_net).to(device)
     else:
-        raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*!')
+        raise RuntimeError('argument *structure* is set to true, no *baseline* or *naive*! argument *no_damp* can only be used with *structure*')
     
     num_parm = get_model_parm_nums(model)
     print('model contains {} parameters'.format(num_parm))
@@ -184,7 +188,8 @@ if __name__ == "__main__":
     else:
         label = '-hnn_ode'
     struct = '-struct' if args.structure else ''
-    path = '{}/{}{}{}-{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
+    no_damp = '-noDamp' if args.no_damp else ''
+    path = '{}/{}{}{}{}-{}-p{}.tar'.format(args.save_dir, args.name, label, struct, args.no_damp, args.solver, args.num_points)
     torch.save(model.state_dict(), path)
-    path = '{}/{}{}{}-{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points)
+    path = '{}/{}{}{}{}-{}-p{}-stats.pkl'.format(args.save_dir, args.name, label, struct, args.no_damp, args.solver, args.num_points)
     to_pickle(stats, path)

@@ -36,6 +36,7 @@ def get_args():
     parser.add_argument('--structure', dest='structure', action='store_true', help='using a structured Hamiltonian')
     parser.add_argument('--rad', dest='rad', action='store_true', help='generate random data around a radius')
     parser.add_argument('--solver', default='rk4', type=str, help='type of ODE Solver for Neural ODE')
+    parser.add_argument('--no_damp', dest='no_damp', action='store_true', help='standard SymODEN, without damping')
     parser.set_defaults(feature=True)
     return parser.parse_args()
 
@@ -59,22 +60,25 @@ def train(args):
     if args.verbose:
         print("Start training with num of points = {} and solver {}.".format(args.num_points, args.solver))
 
-    if args.structure == False and args.baseline == True:
+    if args.structure == False and args.baseline == True and args.no_damp == False:
         nn_model = MLP(args.input_dim, 600, args.input_dim, args.nonlinearity)
         model = SymODEN_R(args.input_dim, H_net=nn_model, device=device, baseline=True).to(device)
-    elif args.structure == False and args.baseline == False:
+    elif args.structure == False and args.baseline == False and args.no_damp == False:
         damp_net = PSD(int(args.input_dim/2), 100, args.input_dim, eps=0.0)
         H_net = MLP(args.input_dim, 400, 1, args.nonlinearity)
         g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2))
         model = SymODEN_R(args.input_dim, H_net=H_net, g_net=g_net, device=device, baseline=False, damp_net=damp_net).to(device)
     elif args.structure == True and args.baseline ==False:
-        damp_net = PSD(int(args.input_dim/2), 100, args.input_dim, eps=0.0)
         M_net = MLP(int(args.input_dim/2), 300, int(args.input_dim/2))
         V_net = MLP(int(args.input_dim/2), 50, 1)
         g_net = MLP(int(args.input_dim/2), 200, int(args.input_dim/2))
-        model = SymODEN_R(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=False, structure=True, damp_net=damp_net).to(device)
+        if args.no_damp:
+            model = SymODEN_R(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=False, structure=True).to(device)
+        else:
+            damp_net = PSD(int(args.input_dim/2), 100, args.input_dim, eps=0.0)
+            model = SymODEN_R(args.input_dim, M_net=M_net, V_net=V_net, g_net=g_net, device=device, baseline=False, structure=True, damp_net=damp_net).to(device)
     else:
-        raise RuntimeError('argument *baseline* and *structure* cannot both be true')
+        raise RuntimeError('argument *baseline* and *structure* cannot both be true, argument *no_damp* can only be used with *structure*')
 
     num_parm = get_model_parm_nums(model)
     print('model contains {} parameters'.format(num_parm))
@@ -167,7 +171,8 @@ if __name__ == "__main__":
     label = '-baseline_ode' if args.baseline else '-hnn_ode'
     struct = '-struct' if args.structure else ''
     rad = '-rad' if args.rad else ''
-    path = '{}/{}{}{}-{}-p{}{}.tar'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points, rad)
+    no_damp = '-noDamp' if args.no_damp else ''
+    path = '{}/{}{}{}{}-{}-p{}{}.tar'.format(args.save_dir, args.name, label, struct, no_damp, args.solver, args.num_points, rad)
     torch.save(model.state_dict(), path)
-    path = '{}/{}{}{}-{}-p{}-stats{}.pkl'.format(args.save_dir, args.name, label, struct, args.solver, args.num_points, rad)
+    path = '{}/{}{}{}{}-{}-p{}-stats{}.pkl'.format(args.save_dir, args.name, label, struct, no_damp, args.solver, args.num_points, rad)
     to_pickle(stats, path)
