@@ -1,6 +1,16 @@
 from gym.envs.registration import register
 
 register(
+    id='MyDampAcrobot-v0',
+    entry_point='myenv.cartpole_damp:AcrobotEnv',
+)
+
+register(
+    id='MyDampCartPole-v0',
+    entry_point='myenv.cartpole_damp:CartPoleEnv',
+)
+
+register(
     id='MyDampPendulum-v0',
     entry_point='myenv.pendulum_damp:PendulumEnv',
 )
