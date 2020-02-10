@@ -2,7 +2,7 @@ from gym.envs.registration import register
 
 register(
     id='MyDampAcrobot-v0',
-    entry_point='myenv.cartpole_damp:AcrobotEnv',
+    entry_point='myenv.acrobot_damp:AcrobotEnv',
 )
 
 register(
