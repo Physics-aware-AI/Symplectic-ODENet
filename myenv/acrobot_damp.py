@@ -173,9 +173,9 @@ class AcrobotEnv(core.Env):
         else:
             # the following line is consistent with the java implementation and the
             # book
-            ddtheta2 = (a + d2 / d1 * phi1 - m2 * l1 * lc2 * dtheta1 ** 2 * np.sin(theta2) - phi2 - 0.1 * dtheta2) \
+            ddtheta2 = (a + d2 / d1 * phi1 - m2 * l1 * lc2 * dtheta1 ** 2 * np.sin(theta2) - phi2 - 0.3 * dtheta2) \
                 / (m2 * lc2 ** 2 + I2 - d2 ** 2 / d1) # add damping 
-        ddtheta1 = -(d2 * ddtheta2 + phi1 - 0.1 * dtheta1) / d1
+        ddtheta1 = -(d2 * ddtheta2 + phi1 - 0.3 * dtheta1) / d1
         return (dtheta1, dtheta2, ddtheta1, ddtheta2, 0.)
 
     def render(self, mode='human'):

@@ -98,7 +98,7 @@ class CartPoleEnv(gym.Env):
         costheta = math.cos(y[2])
         sintheta = math.sin(y[2])
         temp = (u + self.polemass_length * y[3] * y[3] * sintheta) / self.total_mass
-        thetaacc = (self.gravity * sintheta - costheta* temp - 0.1 * y[3]) / (self.length * (4.0/3.0 - self.masspole * costheta * costheta / self.total_mass))
+        thetaacc = (self.gravity * sintheta - costheta* temp - 0.3 * y[3]) / (self.length * (4.0/3.0 - self.masspole * costheta * costheta / self.total_mass))
         f[0] = y[1]
         f[1] = temp - self.polemass_length * thetaacc * costheta / self.total_mass
         f[2] = y[3]
