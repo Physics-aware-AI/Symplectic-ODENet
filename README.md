@@ -72,3 +72,6 @@ This project is written in Python 3.7 and tested with the following packages
 - Numpy: 1.16.2
 - Scipy: 1.2.1
 - ImageIO: 2.4.1
+
+## Acknowledgement
+This research was conceived and primarily carried out during Y. D. Zhong's internship at Siemens Corporation, Corporate Technology. Post-internship, Y. D. Zhong's work was supported by ONR grant \#N00014-18-1-2873.
