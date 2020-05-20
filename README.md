@@ -74,4 +74,4 @@ This project is written in Python 3.7 and tested with the following packages
 - ImageIO: 2.4.1
 
 ## Acknowledgement
-This research was conceived and primarily carried out during Y. D. Zhong's internship at Siemens Corporation, Corporate Technology. Post-internship, Y. D. Zhong's work was supported by ONR grant \#N00014-18-1-2873.
+This research was inspired by the ideas and plans articulated by N. E. Leonard and A. Majumdar, Princeton University, in their ONR grant \#N00014-18-1-2873.  The research was primarily carried out during Y. D. Zhong's internship at Siemens Corporation, Corporate Technology. Pre- and post-internship, Y. D. Zhong's work was supported by ONR grant \#N00014-18-1-2873.
